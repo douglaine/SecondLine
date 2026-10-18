@@ -14,6 +14,9 @@
 #                     Minimum  this version or newer         ('2.40'   -> 2.40+)
 # Optional:
 #   Arguments       how to ask for the version (default: --version)
+#   Match           First (default): use the first version in the output
+#                   Any: the output lists several installed versions; OK if any one passes
+#                   Prerelease builds (-rc, -preview ...) are always flagged in the report.
 #   VersionPattern  regex to find the version in the output; a (?<version>...) group wins
 #   Install         shown when the tool is missing or wrong, so the fix is one copy-paste away
 #   TimeoutSeconds  stop waiting after this long (default: 15)
@@ -38,11 +41,16 @@
             Install = 'winget install --id Microsoft.PowerShell -e'
         }
         @{
-            Name    = '.NET SDK'
-            Command = 'dotnet'
-            Expect  = '10.0'
-            Rule    = 'Minor'
-            Install = 'winget install --id Microsoft.DotNet.SDK.10 -e'
+            # dotnet --version reports only the newest SDK (or the one global.json
+            # pins), which may be a preview. SDKs install side by side, so list
+            # them all and pass if any one satisfies the rule.
+            Name      = '.NET SDK'
+            Command   = 'dotnet'
+            Arguments = '--list-sdks'
+            Match     = 'Any'
+            Expect    = '10.0'
+            Rule      = 'Minor'
+            Install   = 'winget install --id Microsoft.DotNet.SDK.10 -e'
         }
         @{
             # Long-supported line; match what production runs, never newer.

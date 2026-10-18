@@ -58,6 +58,12 @@ function Get-SecondLineStandard {
             $problems.Add("$label has Expect '$($t.Expect)', which is not a version number like 8.0 or 2.13.1.")
         }
 
+        $match = 'First'
+        if ($t.ContainsKey('Match')) { $match = "$($t.Match)" }
+        if (@('First', 'Any') -notcontains $match) {
+            $problems.Add("$label has Match '$match'. Use First (default) or Any.")
+        }
+
         $arguments = '--version'
         if ($t.ContainsKey('Arguments')) { $arguments = "$($t.Arguments)" }
         $timeout = 15
@@ -69,6 +75,7 @@ function Get-SecondLineStandard {
             Arguments      = $arguments
             Expect         = "$($t.Expect)"
             Rule           = "$($t.Rule)"
+            Match          = $match
             VersionPattern = "$($t.VersionPattern)"
             Install        = "$($t.Install)"
             TimeoutSeconds = $timeout

@@ -59,6 +59,23 @@ Describe 'Version text extraction' {
         It 'returns null when nothing looks like a version' {
             Get-SLVersionText -Text 'no numbers here' | Should -BeNullOrEmpty
         }
+        It 'keeps a prerelease tag instead of reporting a preview as a release' {
+            Get-SLVersionText -Text '11.0.100-rc.2.26504.105' | Should -Be '11.0.100-rc.2.26504.105'
+            Test-SLPrerelease '11.0.100-rc.2.26504.105' | Should -BeTrue
+            Test-SLPrerelease '10.0.401' | Should -BeFalse
+        }
+        It 'compares a prerelease by its numbers' {
+            Test-SLVersionRule -Found '11.0.100-rc.2' -Expect '10.0' -Rule 'Minor' | Should -BeFalse
+            Test-SLVersionRule -Found '11.0.100-rc.2' -Expect '11.0' -Rule 'Minor' | Should -BeTrue
+        }
+        It 'reads every version from a list' {
+            $list = "8.0.414 [C:\sdk]`n10.0.103 [C:\sdk]`n10.0.401 [C:\sdk]`n11.0.100-rc.2.26504.105 [C:\sdk]"
+            (Get-SLVersionTexts -Text $list) -join ',' | Should -Be '8.0.414,10.0.103,10.0.401,11.0.100-rc.2.26504.105'
+        }
+        It 'picks the highest release over a newer prerelease' {
+            Select-SLBestVersion @('10.0.103', '11.0.100-rc.2', '10.0.401') | Should -Be '10.0.401'
+            Select-SLBestVersion @('11.0.100-rc.1', '11.0.100-rc.2') | Should -Be '11.0.100-rc.2'
+        }
     }
 }
 
@@ -164,6 +181,30 @@ Describe 'Test-SecondLine' {
         $r = Test-SecondLine -Path $p -PassThru -Quiet
         $sw.Elapsed.TotalSeconds | Should -BeLessThan 15
         $r.Note | Should -Match 'did not exit'
+    }
+
+    It 'Match = Any passes if any listed version satisfies the rule' {
+        $p = New-TestStandard @"
+@{ Tools = @( @{ Name='sdks'; Command='$tool'; Arguments='-NoProfile -Command "''8.0.414 [x]'',''10.0.401 [x]'',''11.0.100-rc.2 [x]''"'; Match='Any'; Expect='10.0'; Rule='Minor' } ) }
+"@
+        $r = Test-SecondLine -Path $p -PassThru -Quiet
+        $r.Status | Should -Be 'OK'
+        $r.Found  | Should -Be '10.0.401'
+        $r.Note   | Should -Match 'installed: 8.0.414, 10.0.401, 11.0.100-rc.2'
+    }
+
+    It 'flags a prerelease in the report' {
+        $p = New-TestStandard @"
+@{ Tools = @( @{ Name='pre'; Command='$tool'; Arguments='-NoProfile -Command "''11.0.100-rc.2''"'; Expect='11.0'; Rule='Minor' } ) }
+"@
+        $r = Test-SecondLine -Path $p -PassThru -Quiet
+        $r.Found | Should -Be '11.0.100-rc.2'
+        $r.Note  | Should -Match 'prerelease'
+    }
+
+    It 'rejects an unknown Match value' {
+        $p = New-TestStandard "@{ Tools = @( @{ Name='x'; Command='x'; Expect='1.0'; Rule='Minimum'; Match='Some' } ) }"
+        { Get-SecondLineStandard -Path $p } | Should -Throw "*Match 'Some'*"
     }
 
     It '-Strict throws when anything is not OK' {

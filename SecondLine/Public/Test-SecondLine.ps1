@@ -33,7 +33,7 @@ function Test-SecondLine {
         Test-SecondLine
 
     .EXAMPLE
-        Test-SecondLine -Path .\standard.psd1 -PassThru -Quiet |
+        Test-SecondLine -Path .\secondline.standard.psd1 -PassThru -Quiet |
             Where-Object Status -ne 'OK'
     #>
     [CmdletBinding()]
@@ -79,22 +79,42 @@ function Test-SecondLine {
             continue
         }
 
-        $found = Get-SLVersionText -Text $run.Output -Pattern $tool.VersionPattern
         $notes = @()
         if ($run.TimedOut) { $notes += "did not exit within $($tool.TimeoutSeconds)s and was stopped" }
 
-        if (-not $found) {
+        $all = @(Get-SLVersionTexts -Text $run.Output -Pattern $tool.VersionPattern)
+        if ($all.Count -eq 0) {
             $result.Status = 'UNKNOWN'
             $notes += "no version found in output of '$($tool.Command) $($tool.Arguments)'"
         }
+        elseif ($tool.Match -eq 'Any') {
+            # Several versions installed side by side (e.g. dotnet --list-sdks).
+            # OK if any satisfies the rule; prefer a release over a prerelease,
+            # then the highest.
+            $passing = @($all | Where-Object { Test-SLVersionRule -Found $_ -Expect $tool.Expect -Rule $tool.Rule })
+            $pick = Select-SLBestVersion $passing
+            if ($pick) {
+                $result.Status = 'OK'
+                $result.Found  = $pick
+            }
+            else {
+                $result.Status = 'MISMATCH'
+                $result.Found  = Select-SLBestVersion $all
+            }
+            $notes += "installed: $($all -join ', ')"
+        }
         else {
-            $result.Found = $found
-            if (Test-SLVersionRule -Found $found -Expect $tool.Expect -Rule $tool.Rule) {
+            $result.Found = $all[0]
+            if (Test-SLVersionRule -Found $all[0] -Expect $tool.Expect -Rule $tool.Rule) {
                 $result.Status = 'OK'
             }
             else {
                 $result.Status = 'MISMATCH'
             }
+        }
+
+        if ($result.Found -and (Test-SLPrerelease $result.Found)) {
+            $notes += 'this is a prerelease build'
         }
         $result.Note = ($notes -join '; ')
         $results += $result

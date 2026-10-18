@@ -18,12 +18,16 @@ function Write-SLReport {
     Write-Host ''
 
     $nameWidth = 4
-    foreach ($r in $Results) { if ($r.Name.Length -gt $nameWidth) { $nameWidth = $r.Name.Length } }
+    $foundWidth = 8
+    foreach ($r in $Results) {
+        if ($r.Name.Length -gt $nameWidth) { $nameWidth = $r.Name.Length }
+        if ("$($r.Found)".Length -gt $foundWidth) { $foundWidth = "$($r.Found)".Length }
+    }
 
     foreach ($r in $Results) {
         $found = $r.Found
         if (-not $found) { $found = '-' }
-        $line = '  {0,-9} {1} {2,-12} expect {3} ({4})' -f $r.Status, $r.Name.PadRight($nameWidth), $found, $r.Expect, $r.Rule
+        $line = '  {0,-9} {1}  {2}  expect {3} ({4})' -f $r.Status, $r.Name.PadRight($nameWidth), $found.PadRight($foundWidth), $r.Expect, $r.Rule
         Write-Host $line -ForegroundColor $colors[$r.Status]
         if ($r.Note) {
             Write-Host ('            ' + $r.Note) -ForegroundColor DarkGray

@@ -67,6 +67,11 @@ Test-SecondLine
 Optional per tool: `Arguments` (default `--version`), `VersionPattern`, `Install`,
 `TimeoutSeconds` (default 15; tools that answer but never exit are stopped and flagged).
 
+`Match = 'Any'` is for tools that install side by side. `dotnet --version` reports only the newest
+SDK, which may be a preview, so use `Arguments = '--list-sdks'; Match = 'Any'` and the check
+passes if any installed SDK satisfies the rule. Prerelease builds (`-rc`, `-preview`, ...) are
+always shown with their tag and flagged, never reported as releases.
+
 The standard is found from `-Path`, then the `SECONDLINE_STANDARD` environment variable,
 then `secondline.standard.psd1` in the current folder.
 
