@@ -4,8 +4,22 @@ All notable changes to SecondLine. Versions follow [Semantic Versioning](https:/
 
 ## 0.3.0 - Unreleased
 
+Every git repo on a machine follows the same line-ending rules, checked and fixed like tool versions.
+
 ### Added
 
+- `Test-SLRepo` finds git repos under a folder (worktrees and submodules too) and reports, per
+  repo, whether its `.gitattributes` matches, extends or differs from its line-ending profile,
+  or is missing, plus committed files that still need `git add --renormalize .`. Read-only.
+  Files are compared by meaning, not text.
+- `Set-SLGitAttributes` writes a missing `.gitattributes`, appends missing rules (keeping every
+  existing line), replaces conflicting ones with `-Force`, then stages and renormalizes. It never
+  commits, refuses a dirty working tree unless `-AllowDirty`, and supports `-WhatIf`.
+- Built-in profiles `docs`, `powershell` and `dotnet`, shipped as files in the module, picked per
+  repo by `-Profile`, a pin in the standard, or detection (a .NET solution or project, a module
+  manifest, else docs).
+- Optional `GitAttributes` section in the standard: add or replace profiles, pin repos to one.
+- `Test-SecondLine -RepoPath` runs the repo check after the tools, in the same report and result.
 - Static analysis with PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`), run in CI on 5.1 and
   7 and locally with `build/Test-Lint.ps1`. It includes compatibility checks, so PowerShell
   7-only syntax and commands fail the build.
@@ -15,6 +29,7 @@ All notable changes to SecondLine. Versions follow [Semantic Versioning](https:/
 
 ### Changed
 
+- A standard no longer needs `Tools` when it has a `GitAttributes` section.
 - The example standard expects PowerShell 7.6 (`Rule = 'Minor'`), the current LTS; 7.4 and 7.5
   reach end of support on 2026-11-10.
 

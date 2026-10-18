@@ -82,6 +82,27 @@ Describe 'git' {
     }
 }
 
+Describe 'Help' {
+    # A help line starting with '.' (say, '.gitattributes') is read as an unknown
+    # keyword, and PowerShell then drops the whole help block without a word.
+    It '<Name> has its comment-based help, with examples and every parameter described' -TestCases @(
+        @{ Name = 'Test-SLRepo' }
+        @{ Name = 'Set-SLGitAttributes' }
+        @{ Name = 'Test-SecondLine' }
+        @{ Name = 'Get-SecondLineStandard' }
+    ) {
+        param($Name)
+        $help = Get-Help $Name
+        $help.Synopsis | Should -Not -Match "^\s*$Name \["
+        if ($Name -ne 'Get-SecondLineStandard') {
+            @($help.Examples.Example).Count | Should -BeGreaterThan 0
+            foreach ($p in @($help.Parameters.Parameter | Where-Object { 'WhatIf', 'Confirm' -notcontains $_.Name })) {
+                "$($p.Description.Text)" | Should -Not -BeNullOrEmpty -Because "-$($p.Name) needs a .PARAMETER entry"
+            }
+        }
+    }
+}
+
 Describe 'git not on PATH' {
     It 'is one clear error with an install hint' {
         Mock Get-Command { } -ModuleName SecondLine -ParameterFilter { $Name -eq 'git' }

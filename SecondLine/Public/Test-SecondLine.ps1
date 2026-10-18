@@ -16,8 +16,8 @@ function Test-SecondLine {
         With -RepoPath, also checks the git repos at or under that folder against
         the .gitattributes line-ending standard (see Test-SLRepo), using the
         standard's GitAttributes section if it has one. Each repo is reported as
-        OK, MISMATCH (rules differ, or files need renormalizing) or MISSING (no
-        .gitattributes), and counts toward -Strict.
+        OK, MISMATCH (rules differ, or files need renormalizing) or MISSING
+        (no .gitattributes file), and counts toward -Strict.
 
         Read-only: nothing is installed or changed.
 

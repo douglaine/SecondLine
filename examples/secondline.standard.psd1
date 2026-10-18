@@ -20,6 +20,12 @@
 #   VersionPattern  regex to find the version in the output; a (?<version>...) group wins
 #   Install         shown when the tool is missing or wrong, so the fix is one copy-paste away
 #   TimeoutSeconds  stop waiting after this long (default: 15)
+#
+# GitAttributes (optional, for Test-SLRepo and Set-SLGitAttributes):
+#   Profiles        add a line-ending profile, or replace a built-in one (docs, powershell,
+#                   dotnet), as a list of .gitattributes lines
+#   Repos           repo folder name -> profile, instead of auto-detection
+# A standard needs Tools, GitAttributes, or both.
 
 @{
     Name    = 'Example standard'
@@ -71,4 +77,14 @@
             Install        = 'winget install --id MongoDB.Shell -e'
         }
     )
+
+    # GitAttributes = @{
+    #     Profiles = @{
+    #         web = @('* text=auto', '*.ts text eol=lf', '*.css text eol=lf', '*.png binary')
+    #     }
+    #     Repos = @{
+    #         'docs-site'   = 'docs'
+    #         'Contoso.Web' = 'web'
+    #     }
+    # }
 }

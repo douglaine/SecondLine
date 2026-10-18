@@ -6,6 +6,7 @@ Keep every dev machine in step.
 
 Declare the tool versions your machines should run in **one file**, then audit each machine
 against it. When something's off, the report tells you what's wrong and how to fix it.
+It also checks that every git repo on the machine follows the same line-ending rules.
 
 ```
   SecondLine - Example standard v1.0.0
@@ -76,6 +77,88 @@ always shown with their tag and flagged, never reported as releases.
 
 The standard is found from `-Path`, then the `SECONDLINE_STANDARD` environment variable,
 then `secondline.standard.psd1` in the current folder.
+
+## Repos: line endings
+
+Every repo should carry a `.gitattributes` that decides line endings, so no machine's
+`core.autocrlf` gets a vote (see [GOTCHAS.md](GOTCHAS.md), "Line endings"). SecondLine checks
+that across all the repos on a machine, and fixes it:
+
+```powershell
+Test-SLRepo C:\src                             # read-only: every repo up to 2 folders down
+Set-SLGitAttributes C:\src\docs-site -WhatIf   # show what it would write and run
+Set-SLGitAttributes C:\src\docs-site           # write it, stage it, renormalize; never commits
+```
+
+```
+  SecondLine - repo line endings
+  C:\src  (built-in profiles)
+
+  DIFFERS   Contoso.Api  dotnet (found src\Contoso.Api\Contoso.Api.csproj)  3 to renormalize
+            missing:  text eol=crlf: *.bat *.cmd *.ps1 *.psm1 *.psd1
+            conflict: *.sln: profile has 'text eol=crlf', repo has 'text eol=lf'
+            committed with CRLF or mixed endings:
+              README.md
+              build.ps1
+              src/Contoso.Api/Contoso.Api.csproj
+            fix: Set-SLGitAttributes -Path 'C:\src\Contoso.Api' -Force   # replaces the conflicting lines
+  MISSING   docs-site    docs (no .NET project or module manifest found)    3 to renormalize
+            no .gitattributes
+            fix: Set-SLGitAttributes -Path 'C:\src\docs-site'
+  EXTENDS   MyApp        dotnet (found MyApp.slnx)                          -
+            extra:    tools/git-hooks/* text eol=lf
+  MATCHES   MyModule     powershell (found MyModule\MyModule.psd1)          -
+
+  2 of 4 repos OK
+```
+
+**What it checks.** Files are compared by meaning, not text: comments, blank lines, spacing and
+order don't matter, and `binary` equals `-diff -merge -text`. A repo **MATCHES** its profile,
+**EXTENDS** it (every profile rule plus its own, which is fine), **DIFFERS** (a rule is missing,
+or a pattern has different attributes), or is **MISSING** a `.gitattributes`. It also counts
+committed text files whose stored copy still has CRLF or mixed endings, which need
+`git add --renormalize .`. A repo is OK when it matches or extends and nothing needs
+renormalizing.
+
+**Profiles.** Three are built in, each a real file under `SecondLine/Profiles/gitattributes`:
+
+| Profile | For | Picked when |
+|---|---|---|
+| `dotnet` | .NET solutions: source LF, `*.sln` CRLF (Visual Studio writes it that way) | a `.sln`, `.slnx`, `.csproj` or `.fsproj` within 3 folders |
+| `powershell` | PowerShell modules (SecondLine's own `.gitattributes`) | a module manifest (`.psd1` with `RootModule` or `ModuleVersion`) within 2 folders |
+| `docs` | docs and notes: text LF, Windows scripts CRLF | anything else |
+
+`-Profile` overrides the choice for every repo; the report says which rule picked each one.
+
+**Fixing.** `Set-SLGitAttributes` writes a missing file from the profile, appends missing rules
+under `# Added by SecondLine` (keeping every existing line), and refuses conflicting rules unless
+you pass `-Force`, which replaces just those lines. It writes UTF-8 without BOM, LF. Then it runs
+`git add .gitattributes` and `git add --renormalize .` and shows what's staged. It never commits.
+It refuses to run on a repo with uncommitted changes to tracked files (`-AllowDirty` to
+override), so the line-ending change gets a commit of its own. Pipe from the check to fix several:
+
+```powershell
+Test-SLRepo C:\src -PassThru -Quiet | Where-Object Status -eq 'MISSING' | Set-SLGitAttributes
+```
+
+**In the standard file** (optional; the commands work without one), add or replace profiles and
+pin repos by folder name:
+
+```powershell
+@{
+    GitAttributes = @{
+        Profiles = @{
+            web = @('* text=auto', '*.ts text eol=lf', '*.png binary')
+        }
+        Repos = @{
+            'docs-site' = 'docs'
+        }
+    }
+}
+```
+
+A standard can have `Tools`, `GitAttributes`, or both. `Test-SecondLine -RepoPath C:\src` runs
+the repo check after the tool checks, in the same report, and `-Strict` counts the repos too.
 
 ## Local MongoDB replica set (Windows)
 

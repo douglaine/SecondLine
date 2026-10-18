@@ -5,8 +5,8 @@ function Test-SLRepo {
 
     .DESCRIPTION
         Finds git repos at or under -Path and, for each one, compares its
-        .gitattributes with the right profile, and counts committed files that
-        still need 'git add --renormalize .'.
+        line-ending rules (the .gitattributes file) with the right profile, and
+        counts committed files that still need 'git add --renormalize .'.
 
         Status values:
           MATCHES  every profile rule is there, with the same attributes, nothing else
@@ -37,8 +37,8 @@ function Test-SLRepo {
 
     .PARAMETER Depth
         How many folders below -Path to look for repos. Default: 2. A repo's own
-        subfolders are never searched, and node_modules, bin, obj, packages and
-        .git are skipped.
+        subfolders are never searched, and folders named node_modules, bin, obj,
+        packages and .git are skipped.
 
     .PARAMETER Profile
         Use this profile for every repo found (overrides pins and detection).
