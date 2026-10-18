@@ -1,6 +1,8 @@
 # Test output
 testResults.xml
 coverage.xml
+ci-failed.log
+*.log
 
 # Editors
 .vs/

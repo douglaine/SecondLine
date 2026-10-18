@@ -1,5 +1,11 @@
 #Requires -Modules @{ ModuleName = 'Pester'; ModuleVersion = '5.0' }
 
+# InModuleScope at Describe level runs during Pester's discovery phase, which
+# happens before BeforeAll. The module must already be loaded then.
+BeforeDiscovery {
+    Import-Module (Join-Path (Split-Path $PSScriptRoot -Parent) 'SecondLine\SecondLine.psd1') -Force
+}
+
 BeforeAll {
     $repo = Split-Path $PSScriptRoot -Parent
     Import-Module (Join-Path $repo 'SecondLine\SecondLine.psd1') -Force
