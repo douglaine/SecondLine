@@ -108,6 +108,23 @@ counts as an expression, even if you meant it literally.
 
 ---
 
+## Testing with Pester
+
+### "No modules named 'X' are currently loaded" during Discovery
+**Symptom:** CI fails before a single test runs: *"Discovery in ... failed with: No modules named
+'X' are currently loaded."* It may pass on your machine because the module is already imported in
+your session.
+**Why:** Pester 5+ runs in two phases. `InModuleScope` placed at `Describe` level runs during
+**discovery**, which happens before any `BeforeAll`, so the import hasn't happened yet.
+**Fix:** also import the module in `BeforeDiscovery { Import-Module ... -Force }` at the top of the
+test file.
+
+### Your tests passing locally proves less than you think
+A module already loaded in your session hides missing imports. Run tests in a fresh process
+(`pwsh -NoProfile -Command Invoke-Pester`), or let CI be the judge.
+
+---
+
 ## Git and GitHub on Windows
 
 ### A repo folder won't delete
