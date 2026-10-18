@@ -1,0 +1,33 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pester:
+    name: Pester (${{ matrix.shell }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]   # Windows PowerShell 5.1 and PowerShell 7
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester 5
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run tests
+        run: |
+          Import-Module Pester -MinimumVersion 5.5
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg

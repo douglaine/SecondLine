@@ -86,6 +86,47 @@ executables into terminating errors.
 **Why:** 5.1 reads BOM-less files as the system code page, not UTF-8.
 **Fix:** save `.ps1` files as UTF-8 **with BOM**.
 
+### `@{` in a git argument is parsed as a hashtable
+**Symptom:** `git log --oneline @{u}..HEAD` fails with *"Missing '=' operator after key in hash
+literal."*
+**Why:** in PowerShell, `@{` starts a hashtable literal. Commands copied from bash docs break.
+**Fix:** quote the argument: `git log --oneline "@{u}..HEAD"`. Same for `"HEAD@{1}"` and
+`"stash@{0}"`.
+
+### 5.1: `Out-File -Encoding utf8` adds a BOM
+**Why:** in Windows PowerShell 5.1, `utf8` means UTF-8 *with* BOM (PowerShell 7 defaults to no BOM).
+Fine for `.ps1` files, unwanted for README, JSON, YAML and other files tools expect BOM-less.
+**Fix:** write them with
+`[IO.File]::WriteAllText($path, $text, (New-Object Text.UTF8Encoding($false)))`.
+
+### `.psd1` data files reject `$` inside double quotes
+**Symptom:** `Import-PowerShellDataFile` fails with *"Cannot generate a PowerShell object for a
+ScriptBlock evaluating dynamic expressions."*
+**Why:** data files are restricted to literal values. A double-quoted string containing `$...`
+counts as an expression, even if you meant it literally.
+**Fix:** use single quotes for any value containing `$`: `Arguments = '-Command $PSVersionTable'`.
+
+---
+
+## Git and GitHub on Windows
+
+### A repo folder won't delete
+**Symptom:** `rmdir` / `Remove-Item` on a cloned repo fails with *"You do not have sufficient access
+rights... or the item is hidden, system, or read only"* on files under `.git\objects`.
+**Why:** git marks its object files read-only, and `Remove-Item` won't delete read-only files
+without `-Force`.
+**Fix:** `Remove-Item <folder> -Recurse -Force`. If it still fails, something has the folder open
+(a terminal inside it, an editor, Explorer).
+
+### `gh repo delete` is refused
+**Why:** the GitHub CLI doesn't get permission to delete repos by default.
+**Fix:** grant it once with `gh auth refresh -h github.com -s delete_repo`, then delete.
+
+### Ahead/behind is only as fresh as your last fetch
+**Symptom:** `git status` says "up to date" while the remote has new commits.
+**Why:** status compares against your local copy of the remote, not the remote itself.
+**Fix:** `git fetch --prune` first (read-only, never touches your files), then `git status -sb`.
+
 ---
 
 ## Case study: a local MongoDB replica set on every machine

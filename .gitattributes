@@ -1,0 +1,7 @@
+# Normalize line endings in the repo; check out PowerShell files with CRLF on Windows.
+* text=auto
+*.ps1  text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.md   text eol=lf
+*.yml  text eol=lf
