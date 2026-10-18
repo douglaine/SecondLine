@@ -7,6 +7,17 @@ function Get-SecondLineStandard {
         A standard is a .psd1 file listing the tools every machine should have,
         the version each should be at, and the rule used to compare versions.
 
+        It can also have a GitAttributes section, used by Test-SLRepo and
+        Set-SLGitAttributes, to add or replace line-ending profiles and pin repos
+        to a profile:
+
+          GitAttributes = @{
+              Profiles = @{ web = @('* text=auto', '*.ts text eol=lf', '*.png binary') }
+              Repos    = @{ 'docs-site' = 'docs' }
+          }
+
+        A standard needs Tools, GitAttributes, or both.
+
         Where the file is looked for, in order:
           1. -Path
           2. the SECONDLINE_STANDARD environment variable
@@ -36,13 +47,16 @@ function Get-SecondLineStandard {
     }
 
     $problems = New-Object System.Collections.Generic.List[string]
-    if (-not $data.ContainsKey('Tools') -or @($data.Tools).Count -eq 0) {
-        $problems.Add("'Tools' is missing or empty.")
+    $hasTools = $data.ContainsKey('Tools') -and $null -ne $data.Tools -and @($data.Tools).Count -gt 0
+    if (-not $hasTools -and -not $data.ContainsKey('GitAttributes')) {
+        $problems.Add("'Tools' is missing or empty. Add at least one tool, or a GitAttributes section.")
     }
 
     $tools = @()
+    $toolEntries = @()
+    if ($hasTools) { $toolEntries = @($data.Tools) }
     $i = 0
-    foreach ($t in @($data.Tools)) {
+    foreach ($t in $toolEntries) {
         $i++
         $label = "Tools[$i]"
         if ($t -isnot [hashtable]) { $problems.Add("$label is not a @{ ... } entry."); continue }
@@ -82,6 +96,11 @@ function Get-SecondLineStandard {
         }
     }
 
+    $gitAttributes = $null
+    if ($data.ContainsKey('GitAttributes')) {
+        $gitAttributes = ConvertTo-SLGitAttributesSection -Section $data.GitAttributes -Problems $problems
+    }
+
     if ($problems.Count -gt 0) {
         throw ("SecondLine standard $Path has problems:`n  - " + ($problems -join "`n  - "))
     }
@@ -92,9 +111,10 @@ function Get-SecondLineStandard {
     if ($data.Version) { $version = "$($data.Version)" }
 
     [pscustomobject]@{
-        Name    = $name
-        Version = $version
-        Path    = $Path
-        Tools   = $tools
+        Name          = $name
+        Version       = $version
+        Path          = $Path
+        Tools         = $tools
+        GitAttributes = $gitAttributes
     }
 }

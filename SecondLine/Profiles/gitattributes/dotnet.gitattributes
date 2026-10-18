@@ -1,0 +1,44 @@
+# Normalize line endings: git stores LF, checks out native per-platform
+* text=auto
+
+# Source & config - always LF in the repo
+*.cs           text eol=lf
+*.razor        text eol=lf
+*.cshtml       text eol=lf
+*.css          text eol=lf
+*.js           text eol=lf
+*.ts           text eol=lf
+*.html         text eol=lf
+*.csproj       text eol=lf
+*.sln          text eol=crlf
+*.slnx         text eol=lf
+*.props        text eol=lf
+*.targets      text eol=lf
+*.json         text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.md           text eol=lf
+*.proto        text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+
+# Windows scripts - CRLF
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+*.ps1          text eol=crlf
+*.psm1         text eol=crlf
+*.psd1         text eol=crlf
+
+# Binaries - never touch
+*.png          binary
+*.jpg          binary
+*.gif          binary
+*.ico          binary
+*.pfx          binary
+*.dll          binary
+*.exe          binary
+*.pdb          binary
+*.zip          binary
+*.nupkg        binary
+*.woff         binary
+*.woff2        binary
