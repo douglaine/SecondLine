@@ -134,6 +134,32 @@ extension picks up automatically. They include `PSUseCompatibleSyntax` and
 `PSUseCompatibleCommands` for 5.1 and 7, so PowerShell 7-only syntax (`??`, `?.`, ternaries,
 `ForEach-Object -Parallel`) and commands fail the check.
 
+## Releasing
+
+`build/Publish-SecondLine.ps1` runs every release check (manifest, changelog, clean and pushed
+git, tests in a fresh process, package contents), then publishes and tags. Try it with `-WhatIf`
+first: that runs every check and publishes nothing.
+
+The PowerShell Gallery API key comes from `SECONDLINE_GALLERY_KEY` if set, else from a secret
+vault, else a hidden prompt. To store the key once instead of pasting it every release:
+
+```powershell
+Install-Module Microsoft.PowerShell.SecretManagement, Microsoft.PowerShell.SecretStore -Scope CurrentUser
+Register-SecretVault -Name LocalStore -ModuleName Microsoft.PowerShell.SecretStore -DefaultVault
+Set-Secret -Name SecondLine.GalleryApiKey      # paste the key at the prompt
+```
+
+The script reads the secret only at the moment of publishing (`-SecretName` and `-Vault` pick a
+different one; `-NoVault` always prompts). After a successful publish from a pasted key, it offers
+to save the key to your default vault, and never saves without asking.
+
+SecretStore asks for its own password once per session (default timeout 15 minutes). That's the
+point: the key is encrypted at rest and useless without the password. You can turn the password
+off with `Set-SecretStoreConfiguration -Authentication None`; then anyone who can run code as
+you can read the key, protected only by your Windows account. Gallery keys expire: if the stored
+key is rejected, the script says so and stops, and `Set-Secret -Name SecondLine.GalleryApiKey`
+replaces it.
+
 ## Works on
 
 Windows PowerShell 5.1 and PowerShell 7 on Windows, tested on both in CI. SecondLine is built

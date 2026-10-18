@@ -12,7 +12,7 @@
       4. Gallery        this version isn't already published
       5. Tests          pass in a fresh PowerShell process
       6. Package        stages ONLY the module folder plus LICENSE
-      7. Publish        asks for the API key at a hidden prompt
+      7. Publish        API key from SECONDLINE_GALLERY_KEY, a secret vault, or a hidden prompt
       8. Tag            creates and pushes vX.Y.Z
       9. Visibility     offers to make the GitHub repo public (asks first)
 
@@ -31,9 +31,34 @@
 .PARAMETER KeepPrivate
     Step 9: leave the GitHub repo private without asking.
 
+.PARAMETER SecretName
+    Step 7: the SecretManagement secret holding the API key.
+    Default: SecondLine.GalleryApiKey.
+
+.PARAMETER Vault
+    Step 7: the vault to read the key from (and offer to save it to).
+    Default: any registered vault to read; the default vault to save.
+
+.PARAMETER NoVault
+    Step 7: don't use SecretManagement at all; always ask for the key.
+
 .NOTES
-    The API key is read from the SECONDLINE_GALLERY_KEY environment variable if
-    it is set (for automation); otherwise it is asked for at a hidden prompt.
+    Where the API key comes from, in order:
+      1. The SECONDLINE_GALLERY_KEY environment variable (for automation).
+      2. Microsoft.PowerShell.SecretManagement, if installed: the secret named
+         -SecretName in -Vault, or in any registered vault. It is read only at
+         the moment of publishing and cleared right after.
+      3. A hidden prompt. After a successful publish, if SecretManagement and a
+         vault are available, you're asked whether to save the key there. It is
+         never saved without a 'y', and never written anywhere else.
+
+    One-time setup for step 2:
+      Install-Module Microsoft.PowerShell.SecretManagement, Microsoft.PowerShell.SecretStore -Scope CurrentUser
+      Register-SecretVault -Name LocalStore -ModuleName Microsoft.PowerShell.SecretStore -DefaultVault
+      Set-Secret -Name SecondLine.GalleryApiKey
+
+    Gallery keys expire. If a stored key is rejected, the script says so and
+    stops; replace it with Set-Secret -Name SecondLine.GalleryApiKey.
 
 .EXAMPLE
     .\build\Publish-SecondLine.ps1 -WhatIf
@@ -47,10 +72,14 @@ param(
     [string] $GitHubRepo = 'douglaine/SecondLine',
     [switch] $SkipTests,
     [switch] $MakePublic,
-    [switch] $KeepPrivate
+    [switch] $KeepPrivate,
+    [string] $SecretName = 'SecondLine.GalleryApiKey',
+    [string] $Vault,
+    [switch] $NoVault
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'GalleryKey.ps1')
 $Repo      = Split-Path $PSScriptRoot -Parent
 $ModuleDir = Join-Path $Repo 'SecondLine'
 $Manifest  = Join-Path $ModuleDir 'SecondLine.psd1'
@@ -208,38 +237,40 @@ try {
 
     # -------------------------------------------------------- 7. publish --
     Write-Step '[7] Publish'
-    $bstr = [IntPtr]::Zero
-    if ($env:SECONDLINE_GALLERY_KEY) {
-        Write-Info 'Using the API key from SECONDLINE_GALLERY_KEY.'
-        $key = $env:SECONDLINE_GALLERY_KEY
-    }
-    else {
-        Write-Info 'Paste your PowerShell Gallery API key. Nothing will show as you paste; that is normal.'
-        $secure = Read-Host -Prompt '  API key' -AsSecureString
-        if (-not $secure -or $secure.Length -eq 0) { Stop-Publish 'No key entered. Nothing was published.' }
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-        $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
-    }
+    $apiKey = Get-GalleryApiKey -SecretName $SecretName -Vault $Vault -NoVault:$NoVault
+    if (-not $apiKey -or -not $apiKey.Key) { Stop-Publish 'No key entered. Nothing was published.' }
+    $keySource = $apiKey.Source
+    $keyVault  = $apiKey.Vault
+    $secure    = $apiKey.Secure
     try {
         # Run from the staging folder so any file the publisher writes to the
         # current directory lands in temp and is deleted, never in the repo.
         Push-Location $stage
-        try { Publish-PSResource -Path $stageModule -Repository $Repository -ApiKey $key -ErrorAction Stop }
+        try { Publish-PSResource -Path $stageModule -Repository $Repository -ApiKey $apiKey.Key -ErrorAction Stop }
         finally { Pop-Location }
     }
     catch {
         $msg = $_.Exception.Message
-        if ($msg -match '403|Forbidden|API key') {
+        $rejected = $msg -match '401|403|Forbidden|Unauthorized|API key'
+        if ($rejected -and $keySource -eq 'Vault') {
+            Stop-Publish ("The API key stored as '$SecretName' in vault '$keyVault' was rejected (Gallery keys expire). " +
+                "Create a new key on powershellgallery.com, replace it with: Set-Secret -Name $SecretName -Vault $keyVault, then run again. ($msg)")
+        }
+        if ($rejected) {
             $msg += ' (Check the key: scope "Push new packages", glob "SecondLine", not expired.)'
         }
         Stop-Publish "Publish failed: $msg"
     }
     finally {
-        if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-        $key = $null
+        $apiKey = $null
     }
     Write-Ok "Published SecondLine $Version"
     Write-Info "https://www.powershellgallery.com/packages/SecondLine/$Version"
+
+    if ($keySource -eq 'Prompt' -and $secure) {
+        [void] (Save-GalleryApiKey -Secure $secure -SecretName $SecretName -Vault $Vault -NoVault:$NoVault)
+    }
+    $secure = $null
 
     # ------------------------------------------------------------ 8. tag --
     Write-Step '[8] Tag'

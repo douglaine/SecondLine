@@ -9,6 +9,9 @@ All notable changes to SecondLine. Versions follow [Semantic Versioning](https:/
 - Static analysis with PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`), run in CI on 5.1 and
   7 and locally with `build/Test-Lint.ps1`. It includes compatibility checks, so PowerShell
   7-only syntax and commands fail the build.
+- `build/Publish-SecondLine.ps1` can read the Gallery API key from a SecretManagement vault
+  (`-SecretName`, `-Vault`, `-NoVault`), and offers to save a pasted key there after a
+  successful publish. See README, "Releasing".
 
 ### Changed
 
