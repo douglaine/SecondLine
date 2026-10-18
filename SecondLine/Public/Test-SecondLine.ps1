@@ -13,6 +13,12 @@ function Test-SecondLine {
           MISSING   not found on PATH
           UNKNOWN   found, but no version could be read from its output
 
+        With -RepoPath, also checks the git repos at or under that folder against
+        the .gitattributes line-ending standard (see Test-SLRepo), using the
+        standard's GitAttributes section if it has one. Each repo is reported as
+        OK, MISMATCH (rules differ, or files need renormalizing) or MISSING (no
+        .gitattributes), and counts toward -Strict.
+
         Read-only: nothing is installed or changed.
 
     .PARAMETER Path
@@ -27,7 +33,11 @@ function Test-SecondLine {
         Don't print the report. Combine with -PassThru for results only.
 
     .PARAMETER Strict
-        Throw if any tool is not OK. Useful in CI.
+        Throw if any tool (or repo, with -RepoPath) is not OK. Useful in CI.
+
+    .PARAMETER RepoPath
+        A git repo, or a folder of repos (searched two folders deep), to check
+        for line endings after the tools.
 
     .EXAMPLE
         Test-SecondLine
@@ -35,13 +45,17 @@ function Test-SecondLine {
     .EXAMPLE
         Test-SecondLine -Path .\secondline.standard.psd1 -PassThru -Quiet |
             Where-Object Status -ne 'OK'
+
+    .EXAMPLE
+        Test-SecondLine -RepoPath C:\src -Strict
     #>
     [CmdletBinding()]
     param(
         [string] $Path,
         [switch] $PassThru,
         [switch] $Quiet,
-        [switch] $Strict
+        [switch] $Strict,
+        [string] $RepoPath
     )
 
     $standard = Get-SecondLineStandard -Path $Path
@@ -120,8 +134,50 @@ function Test-SecondLine {
         $results += $result
     }
 
+    $toolResults = $results
+    $repoChecks = @()
+    if ($RepoPath) {
+        [void] (Get-SLGitPath)
+        if (-not (Test-Path -LiteralPath $RepoPath -PathType Container)) {
+            throw "Repo folder not found: $RepoPath. Pass a repo, or a folder that contains repos."
+        }
+        $RepoPath = (Resolve-Path -LiteralPath $RepoPath).ProviderPath
+        $profiles = Get-SLProfiles -Standard $standard
+        foreach ($repo in @(Find-SLGitRepo -Path $RepoPath)) {
+            $repoChecks += Get-SLRepoCheck -RepoPath $repo -Standard $standard -Profiles $profiles
+        }
+        # One row per repo, shaped like a tool result, so -PassThru, -Strict and
+        # 'Where-Object Status -ne OK' treat them alike.
+        foreach ($c in $repoChecks) {
+            $status = 'OK'
+            if ($c.Status -eq 'MISSING') { $status = 'MISSING' }
+            elseif (-not (Test-SLRepoOk $c)) { $status = 'MISMATCH' }
+            $notes = @($c.MissingRules | ForEach-Object { "missing $_" }) + @($c.ConflictingRules | ForEach-Object { "conflict $_" })
+            if ($c.FilesToRenormalize -gt 0) { $notes += "$($c.FilesToRenormalize) file(s) to renormalize" }
+            if ($c.Note) { $notes += $c.Note }
+            $install = ''
+            if ($status -ne 'OK') { $install = Get-SLRepoFixHint $c }
+            $results += [pscustomobject]@{
+                PSTypeName = 'SecondLine.Result'
+                Name       = "repo $($c.Repo)"
+                Status     = $status
+                Found      = $c.Status
+                Expect     = $c.Profile
+                Rule       = 'gitattributes'
+                Path       = $c.Path
+                Note       = ($notes -join '; ')
+                Install    = $install
+            }
+        }
+    }
+
     if (-not $Quiet) {
-        Write-SLReport -Standard $standard -Results $results
+        if ($RepoPath) {
+            Write-SLReport -Standard $standard -Results $toolResults -Repos $repoChecks -RepoPath $RepoPath
+        }
+        else {
+            Write-SLReport -Standard $standard -Results $results
+        }
     }
 
     if ($PassThru) { $results }
@@ -129,7 +185,9 @@ function Test-SecondLine {
     if ($Strict) {
         $bad = @($results | Where-Object { $_.Status -ne 'OK' })
         if ($bad.Count -gt 0) {
-            throw "SecondLine: $($bad.Count) of $($results.Count) tools are not OK: $(($bad | ForEach-Object { "$($_.Name) ($($_.Status))" }) -join ', ')"
+            $what = 'tools'
+            if ($RepoPath) { $what = 'checks' }
+            throw "SecondLine: $($bad.Count) of $($results.Count) $what are not OK: $(($bad | ForEach-Object { "$($_.Name) ($($_.Status))" }) -join ', ')"
         }
     }
 }
