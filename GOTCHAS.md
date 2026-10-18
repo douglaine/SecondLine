@@ -108,6 +108,60 @@ counts as an expression, even if you meant it literally.
 
 ---
 
+## Line endings
+
+### The rule we follow
+Every repo carries a `.gitattributes` that decides line endings, so no machine's git settings
+(`core.autocrlf`) get a vote:
+- **The repo stores LF.** `* text=auto` normalizes everything that looks like text.
+- **Docs and config are LF everywhere:** `.md`, `.yml`, `.yaml`, `.json`, `.gitignore`,
+  `.gitattributes`.
+- **Windows scripts are CRLF on checkout:** `.ps1`, `.psm1`, `.psd1`, `.bat`, `.cmd`.
+  Windows PowerShell 5.1 tooling and `cmd.exe` expect CRLF.
+- **Binaries are marked `binary`** (`.png`, `.zip`, `.nupkg`, `.pfx`, `.dll` ...), so git never
+  rewrites a byte.
+
+```gitattributes
+* text=auto
+
+*.md           text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.json         text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+
+*.ps1          text eol=crlf
+*.psm1         text eol=crlf
+*.psd1         text eol=crlf
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+
+*.png          binary
+*.zip          binary
+*.nupkg        binary
+```
+Add the language's source types as LF (e.g. `*.cs`, `*.razor`, `*.csproj` for .NET).
+
+### "LF will be replaced by CRLF the next time Git touches it"
+**Symptom:** `git add` warns about files you just created.
+**Why:** the file on disk has LF endings (written by a tool, an editor set to LF, or generated on
+Linux), and `.gitattributes` says that type is checked out CRLF. Git is announcing it will convert
+the working copy. Harmless — the repo copy is correct either way.
+**Fix (to stop the warnings now):** convert the working-copy files to match the rule, then
+renormalize so git re-checks every file against `.gitattributes`:
+```powershell
+git add --renormalize .
+git status          # only real content changes should remain
+```
+
+### Add `.gitattributes` in the first commit
+Adding it to an existing repo means files already committed may have mixed endings. Then
+`git add --renormalize .` and commit the result on its own, so the line-ending change doesn't
+hide inside a real diff.
+
+---
+
 ## Testing with Pester
 
 ### "No modules named 'X' are currently loaded" during Discovery
@@ -118,6 +172,16 @@ your session.
 **discovery**, which happens before any `BeforeAll`, so the import hasn't happened yet.
 **Fix:** also import the module in `BeforeDiscovery { Import-Module ... -Force }` at the top of the
 test file.
+
+### Windows ships Pester 3.4, and `Install-Module Pester` won't replace it
+**Symptom:** `Install-Module Pester -MinimumVersion 5.5` warns *"Version '3.4.0' of module 'Pester'
+is already installed"* and installs nothing. Tests needing Pester 5 then fail.
+**Why:** Windows includes Pester 3.4.0 in `C:\Program Files\WindowsPowerShell\Modules`, signed by
+Microsoft. Installing a newer version beside it needs `-Force`, and newer Pester is signed by a
+different publisher, so it also needs `-SkipPublisherCheck`.
+**Fix:**
+`Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck`.
+Leave 3.4 alone; the newer version wins when loaded.
 
 ### Your tests passing locally proves less than you think
 A module already loaded in your session hides missing imports. Run tests in a fresh process
