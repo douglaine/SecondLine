@@ -1,5 +1,7 @@
 # SecondLine
 
+[![test](https://github.com/douglaine/SecondLine/actions/workflows/test.yml/badge.svg)](https://github.com/douglaine/SecondLine/actions/workflows/test.yml)
+
 Keep every dev machine in step.
 
 Declare the tool versions your machines should run in **one file**, then audit each machine
@@ -33,10 +35,10 @@ checking a machine a one-liner. See [GOTCHAS.md](GOTCHAS.md) for the lessons tha
 ## Quick start
 
 ```powershell
-# from a clone of this repo (Gallery release coming)
-Import-Module .\SecondLine\SecondLine.psd1
+Install-PSResource SecondLine        # PowerShell 7.4+; on 5.1: Install-Module SecondLine
 
-Copy-Item .\examples\secondline.standard.psd1 .
+# grab the example standard, then edit it for your team
+Invoke-WebRequest https://raw.githubusercontent.com/douglaine/SecondLine/main/examples/secondline.standard.psd1 -OutFile secondline.standard.psd1
 Test-SecondLine
 ```
 
@@ -84,4 +86,9 @@ Test-SecondLine -Strict        # throws if anything isn't OK
 
 ## Works on
 
-Windows PowerShell 5.1 and PowerShell 7. Tested on both in CI.
+Windows PowerShell 5.1 and PowerShell 7 on Windows, tested on both in CI. SecondLine is built
+for Windows dev machines first; other platforms may work but aren't tested yet.
+
+## License
+
+[MIT](LICENSE)

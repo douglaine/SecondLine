@@ -17,8 +17,10 @@
 
     PrivateData = @{
         PSData = @{
-            Tags       = @('DevEnvironment', 'Versions', 'Audit', 'Consistency', 'Windows', 'PSEdition_Desktop', 'PSEdition_Core')
-            ProjectUri = 'https://github.com/douglaine/SecondLine'
+            Tags         = @('DevEnvironment', 'Versions', 'Audit', 'Consistency', 'Windows', 'PSEdition_Desktop', 'PSEdition_Core')
+            ProjectUri   = 'https://github.com/douglaine/SecondLine'
+            LicenseUri   = 'https://github.com/douglaine/SecondLine/blob/main/LICENSE'
+            ReleaseNotes = 'https://github.com/douglaine/SecondLine/blob/main/CHANGELOG.md'
         }
     }
 }
