@@ -34,11 +34,12 @@
             Install = 'winget install --id Git.Git -e'
         }
         @{
+            # 7.6 is the current LTS; 7.4 and 7.5 reach end of support 2026-11-10.
             Name    = 'PowerShell 7'
             Command = 'pwsh'
-            Expect  = '7.4'
-            Rule    = 'Minimum'
-            Install = 'winget install --id Microsoft.PowerShell -e'
+            Expect  = '7.6'
+            Rule    = 'Minor'
+            Install = 'winget upgrade --id Microsoft.PowerShell -e'
         }
         @{
             # dotnet --version reports only the newest SDK (or the one global.json

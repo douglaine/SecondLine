@@ -2,6 +2,19 @@
 
 All notable changes to SecondLine. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.3.0 - Unreleased
+
+### Added
+
+- Static analysis with PSScriptAnalyzer (`PSScriptAnalyzerSettings.psd1`), run in CI on 5.1 and
+  7 and locally with `build/Test-Lint.ps1`. It includes compatibility checks, so PowerShell
+  7-only syntax and commands fail the build.
+
+### Changed
+
+- The example standard expects PowerShell 7.6 (`Rule = 'Minor'`), the current LTS; 7.4 and 7.5
+  reach end of support on 2026-11-10.
+
 ## 0.2.0 - 2026-10-18
 
 Local MongoDB replica sets on Windows, without the usual mlaunch pain.

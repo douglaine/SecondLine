@@ -12,7 +12,7 @@ against it. When something's off, the report tells you what's wrong and how to f
   C:\src\myproject\secondline.standard.psd1
 
   OK        git            2.45.1       expect 2.40 (Minimum)
-  OK        PowerShell 7   7.4.6        expect 7.4 (Minimum)
+  OK        PowerShell 7   7.6.1        expect 7.6 (Minor)
   OK        .NET SDK       10.0.100     expect 10.0 (Minor)
   MISMATCH  MongoDB Server 8.2.3        expect 8.0 (Minor)
             fix: winget install --id MongoDB.Server -e --version 8.0.x
@@ -117,6 +117,22 @@ Needs `mlaunch` (`pip install mtools`) and `mongosh` on PATH.
 Test-SecondLine -PassThru -Quiet | Where-Object Status -ne 'OK'
 Test-SecondLine -Strict        # throws if anything isn't OK
 ```
+
+## Linting
+
+The module is checked with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer)
+in CI, on both Windows PowerShell 5.1 and PowerShell 7. Run the same check before pushing:
+
+```powershell
+Install-Module PSScriptAnalyzer -Scope CurrentUser   # once
+.\build\Test-Lint.ps1                                # exits 1 on any Error or Warning
+.\build\Format-SecondLine.ps1 -WhatIf               # layout fixes, same settings
+```
+
+The rules live in `PSScriptAnalyzerSettings.psd1` at the repo root, which VS Code's PowerShell
+extension picks up automatically. They include `PSUseCompatibleSyntax` and
+`PSUseCompatibleCommands` for 5.1 and 7, so PowerShell 7-only syntax (`??`, `?.`, ternaries,
+`ForEach-Object -Parallel`) and commands fail the check.
 
 ## Works on
 
