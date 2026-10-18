@@ -77,6 +77,40 @@ always shown with their tag and flagged, never reported as releases.
 The standard is found from `-Path`, then the `SECONDLINE_STANDARD` environment variable,
 then `secondline.standard.psd1` in the current folder.
 
+## Local MongoDB replica set (Windows)
+
+Multi-document transactions and change streams need a replica set, even on a dev machine.
+`mlaunch` creates one, but on Windows it's rough: `mlaunch stop` fails, nodes take a while to open
+their ports, and apps that connect before a PRIMARY is elected can't write. SecondLine wraps it:
+
+```powershell
+Start-SLMongo        # start, wait for every port, then wait for a PRIMARY
+Get-SLMongoStatus    # UP / ELECTING / PARTIAL / DOWN, PRIMARY, each member's state
+Stop-SLMongo         # mlaunch stop -> clean shutdown -> kill (this set's mongod only)
+```
+
+```
+  SecondLine - MongoDB replica set 'replset'  UP
+  C:\Users\you\mongo-dev\data\replset
+
+  27017  PRIMARY    C:\Users\you\mongo-dev\data\replset\replset\rs1\db
+  27018  SECONDARY  C:\Users\you\mongo-dev\data\replset\replset\rs2\db
+  27019  SECONDARY  C:\Users\you\mongo-dev\data\replset\replset\rs3\db
+
+  PRIMARY: localhost:27017
+```
+
+**Which set?** SecondLine reads each `.mlaunch_startup` (written by `mlaunch init --dir <folder>`)
+and checks that every node's data folder exists, so a stale startup file is reported, not used.
+It looks at `-Path`, then `SECONDLINE_MONGO_DIR`, then searches `SECONDLINE_MONGO_ROOT` (default
+`~/mongo-dev`, `~/mlaunch`, `~/data`). If it finds more than one usable set, it asks.
+`Find-SLMongoReplicaSet` shows what it found and why each one is or isn't usable.
+
+**Safe stop.** If it has to kill processes, it matches `mongod` by data folder, never by port, so
+nothing else listening on 27017 is touched. `-NoKill` stops before that step.
+
+Needs `mlaunch` (`pip install mtools`) and `mongosh` on PATH.
+
 ## In scripts and CI
 
 ```powershell

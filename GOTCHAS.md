@@ -191,6 +191,13 @@ A module already loaded in your session hides missing imports. Run tests in a fr
 
 ## Git and GitHub on Windows
 
+### `Remove-Item -Recurse` skips hidden files without `-Force`
+**Symptom:** *"Directory ... cannot be removed because it is not empty"* on a folder that looks
+empty.
+**Why:** hidden files (on Windows the Hidden attribute; on Linux and macOS any dotfile, such as
+`.mlaunch_startup`) are skipped unless you pass `-Force`.
+**Fix:** `Remove-Item <folder> -Recurse -Force`.
+
 ### A repo folder won't delete
 **Symptom:** `rmdir` / `Remove-Item` on a cloned repo fails with *"You do not have sufficient access
 rights... or the item is hidden, system, or read only"* on files under `.git\objects`.
@@ -216,6 +223,26 @@ without `-Force`.
 Multi-document transactions and change streams require a replica set; the default standalone
 install doesn't support them. If the app needs them, a local replica set is a requirement of every
 dev machine — put it in the standard.
+
+### A stale `.mlaunch_startup` can point at folders that don't exist
+**Symptom:** scripts work on one machine and fail on another, or work only because they happen to
+check one folder before another.
+**Why:** each `mlaunch init --dir X` writes `X\.mlaunch_startup`. Re-running init in a different
+folder, or moving data, leaves the old file behind. It still looks valid, but the node data folders
+it names (recorded as `--dbpath` under `startup_info`) are gone.
+**Fix:** don't pick a folder by search order. Read each `.mlaunch_startup`, check that every
+`--dbpath` it records exists, and use the one that's valid; if more than one is, ask.
+
+### A backed-up `.mlaunch_startup` looks like a second replica set
+**Symptom:** a copy of the startup file kept in a backup folder points at the same, existing data
+folders, so it passes the "do the folders exist?" check too.
+**Fix:** every `.mlaunch_startup` records the folder it was created for (`parsed_args.dir`). If
+that isn't the folder the file sits in, it's a copy. Ignore it.
+
+### Kill by data folder, never by port
+When a stop has to fall back to killing processes, killing "whatever owns port 27017" can take out
+something that isn't your replica set. Match `mongod` processes by the `--dbpath` in their command
+line instead (`Win32_Process.CommandLine` on Windows).
 
 ### "Started" isn't "ready"
 Wait for the ports to listen (allow ~60 s on a cold start), then for a PRIMARY to be elected.

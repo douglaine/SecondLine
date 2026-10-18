@@ -33,7 +33,7 @@ function Invoke-SLTool {
         [void] $proc.Start()
     }
     catch {
-        return [pscustomobject]@{ Output = ''; TimedOut = $false; Error = $_.Exception.Message }
+        return [pscustomobject]@{ Output = ''; TimedOut = $false; Error = $_.Exception.Message; ExitCode = -1 }
     }
 
     # Read both streams asynchronously so a full buffer can't deadlock the child.
@@ -49,7 +49,9 @@ function Invoke-SLTool {
     $out = ''
     if ($outTask.Wait(2000)) { $out += $outTask.Result }
     if ($errTask.Wait(2000)) { $out += "`n" + $errTask.Result }
+    $code = -1
+    if (-not $timedOut) { try { $code = $proc.ExitCode } catch { $code = -1 } }
     $proc.Dispose()
 
-    return [pscustomobject]@{ Output = $out.Trim(); TimedOut = $timedOut; Error = $null }
+    return [pscustomobject]@{ Output = $out.Trim(); TimedOut = $timedOut; Error = $null; ExitCode = $code }
 }
