@@ -2,11 +2,15 @@
 
 All notable changes to SecondLine. Versions follow [Semantic Versioning](https://semver.org).
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-10-21
 
 Every git repo on a machine follows the same line-ending rules, checked and fixed like tool versions.
 
 ### Added
+
+- Parent-folder standard discovery and explicit recursive Extends inheritance, including relative parents, the packaged @development baseline, child overrides, and cycle detection.
+
+- Shipped shared .NET developer baseline at `SecondLine/Standards/development.psd1`: Git 2+ and a selected stable .NET 10.0 SDK. Consumers inherit it with Extends = '@development' and override tools by Name for stricter project pins.
 
 - `Test-SLRepo` finds git repos under a folder (worktrees and submodules too) and reports, per
   repo, whether its `.gitattributes` matches, extends or differs from its line-ending profile,

@@ -506,8 +506,8 @@ function ConvertTo-SLGitAttributesSection {
 function Get-SLOptionalStandard {
     param([string] $Path)
     if ($Path -or $env:SECONDLINE_STANDARD) { return Get-SecondLineStandard -Path $Path }
-    $here = Join-Path (Get-Location).ProviderPath 'secondline.standard.psd1'
-    if (Test-Path -LiteralPath $here -PathType Leaf) { return Get-SecondLineStandard -Path $here }
+    $here = Find-SLStandardPath
+    if ($here -and (Test-Path -LiteralPath $here -PathType Leaf)) { return Get-SecondLineStandard -Path $here }
     return $null
 }
 

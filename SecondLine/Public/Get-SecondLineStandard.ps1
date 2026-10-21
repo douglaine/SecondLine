@@ -21,7 +21,7 @@ function Get-SecondLineStandard {
         Where the file is looked for, in order:
           1. -Path
           2. the SECONDLINE_STANDARD environment variable
-          3. secondline.standard.psd1 in the current folder
+          3. nearest secondline.standard.psd1 in the current folder or its parents
 
     .EXAMPLE
         Get-SecondLineStandard -Path .\secondline.standard.psd1
@@ -32,7 +32,8 @@ function Get-SecondLineStandard {
     )
 
     if (-not $Path) { $Path = $env:SECONDLINE_STANDARD }
-    if (-not $Path) { $Path = Join-Path (Get-Location) 'secondline.standard.psd1' }
+    if (-not $Path) { $Path = Find-SLStandardPath }
+    if (-not $Path) { throw 'SecondLine standard not found in the current folder or its parents.' }
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "SecondLine standard not found: $Path. Pass -Path, set SECONDLINE_STANDARD, or put secondline.standard.psd1 in the current folder."
@@ -40,7 +41,7 @@ function Get-SecondLineStandard {
     $Path = (Resolve-Path -LiteralPath $Path).ProviderPath
 
     try {
-        $data = Import-PowerShellDataFile -LiteralPath $Path
+        $data = Read-SLStandardData -Path $Path
     }
     catch {
         throw "Could not read $Path as a PowerShell data file: $($_.Exception.Message)"

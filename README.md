@@ -251,3 +251,33 @@ for Windows dev machines first; other platforms may work but aren't tested yet.
 ## License
 
 [MIT](LICENSE)
+
+## Shared developer baseline (0.3.0)
+
+`SecondLine/Standards/development.psd1` provides the common Git and .NET baseline.
+Projects inherit it with `Extends = '@development'` and keep project-specific SDK
+requirements in their own standard. Subfolders discover the nearest standard.
+Use the same reviewed SecondLine release across projects; editing a local checkout
+does not update installed Gallery copies. Child overrides intentionally replace named
+requirements, so review them when changing a project's standard.
+
+This baseline only audits configuration. It does not install tools, change SDK pins,
+or start or stop MongoDB instances.
+
+### Inherit a shared standard
+
+When no `-Path` or `SECONDLINE_STANDARD` is supplied, SecondLine searches the current folder and then its parents for the nearest `secondline.standard.psd1`. A nested project can use that standard unchanged, or declare its own standard with an explicit parent:
+
+```powershell
+@{
+    Extends = '@development'
+    Name = 'My project environment'
+    Tools = @(
+        @{ Name = '.NET SDK selected by this repository'; Command = 'dotnet'; Expect = '10.0.401'; Rule = 'Exact' }
+    )
+}
+```
+
+`@development` resolves to the baseline inside the installed SecondLine package. Other `Extends` values are absolute paths or paths relative to the declaring file, for example `../secondline.standard.psd1`. One parent is supported per file; parents may themselves extend another standard. Missing parents and circular inheritance are errors (maximum chain: 64 files).
+
+Child tools replace complete parent entries with the same `Name`, case-insensitively; other parent tools remain. Child metadata overrides parent metadata. `GitAttributes.Profiles` and `GitAttributes.Repos` merge by key, with child values winning. Inheritance reads data files only and installs or starts nothing.
