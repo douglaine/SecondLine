@@ -73,6 +73,15 @@ config file, without slowing or blocking the shell.
   reuse that service as its first check task rather than add a second one.
 - **Per-machine settings:** 0.4.0 already has machine and user `settings.psd1` layers
   (`Get-SLSetting`). Task on/off switches belong there or in the standard, not in a new file.
+- **Prune old versions without breaking rollback:** `Update-PSResource` / `Update-Module` never
+  remove old versions, so they pile up (0.2.0, 0.3.0, 0.4.1 on one machine already). A prune task
+  (an action under the runner, off by default) keeps:
+  - the newest installed version,
+  - the last-known-good version the rollback pointer names, since rollback loads that version's
+    folder and has nothing to fall back to if it's gone,
+  - any version a project's standard pins with `ModuleVersions`,
+  and removes only versions older than all of those. It skips a version that's loaded in a
+  running session (its files are locked) and reports what it removed. `-WhatIf` lists first.
 - **Crash guard:** a task that fails or times out on two starts in a row is marked suspended and
   skipped until the user clears it (`Resume-SLTask <name>`), so one broken task can't break
   every shell.
