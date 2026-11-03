@@ -10,7 +10,7 @@ function Write-SLReport {
         [string] $RepoPath
     )
 
-    $colors = @{ OK = 'Green'; MISMATCH = 'Red'; MISSING = 'Red'; UNKNOWN = 'Yellow' }
+    $colors = @{ OK = 'Green'; MISMATCH = 'Red'; MISSING = 'Red'; UNKNOWN = 'Yellow'; SKIPPED = 'DarkGray' }
 
     $title = $Standard.Name
     if ($Standard.Version) { $title = "$title v$($Standard.Version)" }
@@ -30,6 +30,7 @@ function Write-SLReport {
     foreach ($r in $Results) {
         $found = $r.Found
         if (-not $found) { $found = '-' }
+        if ($r.Status -eq 'SKIPPED') { $found = '-' }
         $line = '  {0,-9} {1}  {2}  expect {3} ({4})' -f $r.Status, $r.Name.PadRight($nameWidth), $found.PadRight($foundWidth), $r.Expect, $r.Rule
         Write-Host $line -ForegroundColor $colors[$r.Status]
         if ($r.Note) {
@@ -41,9 +42,12 @@ function Write-SLReport {
     }
 
     $ok = @($Results | Where-Object { $_.Status -eq 'OK' }).Count
+    $skipped = @($Results | Where-Object { $_.Status -eq 'SKIPPED' }).Count
+    $checked = $Results.Count - $skipped
     $summaryColor = 'Green'
-    if ($ok -ne $Results.Count) { $summaryColor = 'Yellow' }
-    $summary = "{0} of {1} tools OK" -f $ok, $Results.Count
+    if ($ok -ne $checked) { $summaryColor = 'Yellow' }
+    $summary = "{0} of {1} tools OK" -f $ok, $checked
+    if ($skipped -gt 0) { $summary = "$summary ($skipped skipped, not used here)" }
 
     if ($PSBoundParameters.ContainsKey('Repos')) {
         if ($Results.Count -gt 0) { Write-Host '' }

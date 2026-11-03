@@ -213,6 +213,67 @@ Describe 'Test-SecondLine' {
         { Get-SecondLineStandard -Path $p } | Should -Throw "*Match 'Some'*"
     }
 
+    Context 'AppliesWhen' {
+        BeforeAll {
+            $okBody = "@{ Tools = @( @{ Name='shell'; Command='$tool'; Arguments='$args5'; Expect='$($self.Major).$($self.Minor)'; Rule='Minor'; AppliesWhen=@('*.sln','global.json') } ) }"
+        }
+
+        It 'reports SKIPPED in a folder with no matching file, and -Strict accepts it' {
+            $p = New-TestStandard $okBody
+            $dir = Join-Path $TestDrive ('plain-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $dir | Out-Null
+            Push-Location -LiteralPath $dir
+            try {
+                $r = Test-SecondLine -Path $p -PassThru -Quiet
+                { Test-SecondLine -Path $p -Quiet -Strict } | Should -Not -Throw
+            }
+            finally { Pop-Location }
+            $r.Status | Should -Be 'SKIPPED'
+            $r.Note   | Should -Match 'no \*\.sln, global\.json in this folder'
+        }
+
+        It 'checks the tool in a folder that has a matching file' {
+            $p = New-TestStandard $okBody
+            $dir = Join-Path $TestDrive ('sln-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $dir | Out-Null
+            Set-Content -LiteralPath (Join-Path $dir 'App.sln') -Value ''
+            Push-Location -LiteralPath $dir
+            try { $r = Test-SecondLine -Path $p -PassThru -Quiet }
+            finally { Pop-Location }
+            $r.Status | Should -Be 'OK'
+        }
+
+        It 'inside a repo, finds a match anywhere in the repo, not just the current folder' {
+            $p = New-TestStandard $okBody
+            $root = Join-Path $TestDrive ('repo-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path (Join-Path $root '.git') | Out-Null
+            New-Item -ItemType Directory -Path (Join-Path $root 'src\App') | Out-Null
+            New-Item -ItemType Directory -Path (Join-Path $root 'docs') | Out-Null
+            Set-Content -LiteralPath (Join-Path $root 'src\App\App.sln') -Value ''
+            Push-Location -LiteralPath (Join-Path $root 'docs')
+            try { $r = Test-SecondLine -Path $p -PassThru -Quiet }
+            finally { Pop-Location }
+            $r.Status | Should -Be 'OK'
+        }
+
+        It 'ignores matches inside bin and obj' {
+            $p = New-TestStandard $okBody
+            $root = Join-Path $TestDrive ('binonly-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path (Join-Path $root '.git') | Out-Null
+            New-Item -ItemType Directory -Path (Join-Path $root 'bin') | Out-Null
+            Set-Content -LiteralPath (Join-Path $root 'bin\global.json') -Value '{}'
+            Push-Location -LiteralPath $root
+            try { $r = Test-SecondLine -Path $p -PassThru -Quiet }
+            finally { Pop-Location }
+            $r.Status | Should -Be 'SKIPPED'
+        }
+
+        It 'rejects an empty AppliesWhen' {
+            $p = New-TestStandard "@{ Tools = @( @{ Name='x'; Command='x'; Expect='1.0'; Rule='Minimum'; AppliesWhen=@() } ) }"
+            { Get-SecondLineStandard -Path $p } | Should -Throw '*empty AppliesWhen*'
+        }
+    }
+
     It '-Strict throws when anything is not OK' {
         $p = New-TestStandard "@{ Tools = @( @{ Name='ghost'; Command='secondline-no-such-tool'; Expect='1.0'; Rule='Minimum' } ) }"
         { Test-SecondLine -Path $p -Quiet -Strict } | Should -Throw '*not OK*'

@@ -13,5 +13,7 @@ Describe 'Shared developer baseline' {
         $dotnet.Arguments | Should -Be '--version'
         $dotnet.Expect | Should -Be '10.0'
         $dotnet.Rule | Should -Be 'Minor'
+        $dotnet.AppliesWhen | Should -Contain '*.sln'
+        $dotnet.AppliesWhen | Should -Contain 'global.json'
     }
 }
