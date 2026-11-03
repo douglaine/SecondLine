@@ -83,6 +83,26 @@ function Stop-Checks([string] $Text) {
     exit 1
 }
 
+# CI keeps its modules in one fixed folder (SECONDLINE_MODULE_DIR) that the workflow
+# caches, instead of wherever this PowerShell installs for the user. Every stage runs
+# in a new process, so each one puts that folder first on the module path.
+$moduleDir = $env:SECONDLINE_MODULE_DIR
+if ($moduleDir) {
+    if (-not (Test-Path -LiteralPath $moduleDir)) { New-Item -ItemType Directory -Path $moduleDir -Force | Out-Null }
+    $env:PSModulePath = $moduleDir + [IO.Path]::PathSeparator + $env:PSModulePath
+}
+
+# Installs a module: into the cached folder in CI, otherwise for the current user.
+function Install-CheckModule([string] $Name, [string] $MinimumVersion) {
+    $common = @{ Name = $Name; Force = $true }
+    if ($MinimumVersion) { $common.MinimumVersion = $MinimumVersion }
+    if ($moduleDir) { Save-Module @common -Path $moduleDir }
+    else {
+        # Windows ships Pester 3.4 signed by Microsoft; a side-by-side 5.x needs -SkipPublisherCheck.
+        Install-Module @common -Scope CurrentUser -SkipPublisherCheck
+    }
+}
+
 function Test-PesterOk {
     return [bool] (Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version] '5.5' } | Select-Object -First 1)
 }
@@ -116,13 +136,12 @@ if ($Stage -contains 'Modules') {
     }
     if (-not (Test-PesterOk)) {
         if (-not $InstallMissing) { Stop-Checks "Pester 5.5+ is not installed for $shell. Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck" }
-        # Windows ships Pester 3.4 signed by Microsoft; a side-by-side 5.x needs -SkipPublisherCheck.
-        Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+        Install-CheckModule Pester '5.5'
         $installed += 'Pester'
     }
     if ($needPssa) {
         if (-not $InstallMissing) { Stop-Checks "PSScriptAnalyzer is not installed for $shell. Install-Module PSScriptAnalyzer -Scope CurrentUser" }
-        Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+        Install-CheckModule PSScriptAnalyzer
         $installed += 'PSScriptAnalyzer'
     }
     if ($installed.Count -gt 0) { Complete-Stage "(installed $($installed -join ', '))" } else { Complete-Stage '(already present)' }

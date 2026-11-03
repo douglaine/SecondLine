@@ -23,6 +23,10 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# Modules live in one fixed folder that CI controls and caches.
+env:
+  SECONDLINE_MODULE_DIR: ${{ github.workspace }}\..\ci-modules
+
 # Each stage is its own step, so the run page shows which one is running or failed,
 # with its own time and log. The Summary step adds one table of every stage.
 jobs:
@@ -37,13 +41,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Installing Pester and PSScriptAnalyzer took minutes per run; cache them.
+      # Installing Pester and PSScriptAnalyzer took minutes per run; cache the folder.
       # Change the key's version suffix to pick up newer module releases.
       - name: Cache PowerShell modules
         uses: actions/cache@v6
         with:
-          path: ~\Documents\PowerShell\Modules
-          key: modules-pwsh-pester5-pssa-v1
+          path: ${{ env.SECONDLINE_MODULE_DIR }}
+          key: modules-pwsh-pester5-pssa-v2
 
       - name: Modules
         run: ./build/Invoke-Checks.ps1 -Stage Modules -InstallMissing
@@ -79,8 +83,8 @@ jobs:
       - name: Cache PowerShell modules
         uses: actions/cache@v6
         with:
-          path: ~\Documents\WindowsPowerShell\Modules
-          key: modules-powershell-pester5-v1
+          path: ${{ env.SECONDLINE_MODULE_DIR }}
+          key: modules-powershell-pester5-v2
 
       - name: Modules
         run: ./build/Invoke-Checks.ps1 -Stage Modules -TestsOnly -InstallMissing
