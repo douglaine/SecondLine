@@ -60,6 +60,19 @@ config file, without slowing or blocking the shell.
   - If the old version folder is gone (`Uninstall-Module -AllVersions`, manual cleanup), there's
     nothing to roll back to: report it and run no tasks.
   - Rollback is only for upgrade failures. An ordinary task failure is the crash guard's job.
+- **Update check against the PowerShell Gallery:** a built-in check task (off by default, at
+  most daily) asks the Gallery for the newest published SecondLine and compares it with the
+  installed version. If newer, the next prompt shows "SecondLine 0.3.0 available". Read-only:
+  nothing about the machine is sent, and there's no server of our own.
+  - Use `Find-PSResource` (PSResourceGet, built into PowerShell 7.4+) when present; fall back to
+    `Find-Module` on 5.1.
+  - On 5.1, an old PowerShellGet can stop and ask to install the NuGet provider. In a
+    background job that prompt hangs forever, so if the provider is missing, skip the check and
+    report it instead of calling `Find-Module`.
+  - 5.1 may also need TLS 1.2 enabled for the session to reach the Gallery.
+  - Offline or slow: the job times out quietly and tries again next day. It never delays a shell.
+  - The check only reports. Installing stays a deliberate `Update-Module`, and the safe-mode
+    first run and rollback take over from there.
 - **Crash guard:** a task that fails or times out on two starts in a row is marked suspended and
   skipped until the user clears it (`Resume-SLTask <name>`), so one broken task can't break
   every shell.
