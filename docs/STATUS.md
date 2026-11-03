@@ -4,8 +4,13 @@ Where the project stands and what's next. Released work is in [CHANGELOG.md](../
 
 ## Current
 
-- **0.2.0** (2026-10-18) on the PowerShell Gallery: machine audit (`Test-SecondLine`) and local
-  MongoDB replica-set commands (`Start-/Stop-/Get-SLMongoStatus`, `Find-SLMongoReplicaSet`).
+- **0.3.0** (2026-10-21) on the PowerShell Gallery: standards with parent-folder discovery and
+  `Extends` inheritance (including the shipped `@development` baseline), repo line-ending checks
+  and fixes (`Test-SLRepo`, `Set-SLGitAttributes`), PSScriptAnalyzer in CI.
+  - 0.3.0 was released from `feature/repo-line-endings` (tagged `v0.3.0`) and is not merged into
+    `main` yet. `main` still carries 0.2.0 code.
+- **0.2.0** (2026-10-18): local MongoDB replica-set commands (`Start-/Stop-/Get-SLMongoStatus`,
+  `Find-SLMongoReplicaSet`).
 
 ## To do
 
@@ -16,7 +21,10 @@ config file, without slowing or blocking the shell.
 
 - **Task registry in the module:** each task has a name, the function it calls, and a kind
   (check or action). New features register themselves; the runner never needs editing.
-- **Per-machine config (`.psd1`):** turns each task on or off and sets how often it runs
+- **Per-machine config:** build on the 0.3.0 standard file rather than a second config format.
+  Add an optional `Tasks` section to the standard, the way `GitAttributes` was added, so tasks
+  inherit through `Extends` like everything else: a shared baseline can list tasks (all off),
+  and each machine's standard overrides by name to turn on what it wants. It turns each task on or off and sets how often it runs
   (`Startup`, `Daily`, `Weekly`, `OnDemand`). Read with `Import-PowerShellDataFile`, which works in
   5.1 and 7. Everything is opt-in: no config file means nothing runs, and a task a new release
   adds stays off until the user turns it on, so an upgrade never starts Mongo or anything else
