@@ -2,6 +2,14 @@
 
 All notable changes to SecondLine. Versions follow [Semantic Versioning](https://semver.org).
 
+## 0.4.1 - 2026-11-03
+
+### Changed
+
+- The PowerShell Gallery description now leads with the headline feature, one rulebook for every
+  AI coding agent, and mentions the update notices and `AppliesWhen`. New Gallery tags (AI,
+  CodingAgents, ClaudeCode, Codex, UpdateCheck) make it easier to find. No code changes.
+
 ## 0.4.0 - 2026-11-03
 
 Headline: **one rulebook for every AI coding agent.** `CLAUDE.md` and `AGENTS.md` in every repo point at the same versioned, hash-stamped rules, with a handoff note per repo, and one command audits them all. Also: one approved SecondLine version per project, one shared update check, and line endings checked end to end. Minor version: these are new, backward-compatible features. Nothing from 0.3.0 changes incompatibly.
