@@ -231,6 +231,63 @@ without `-Force`.
 
 ---
 
+## CI on GitHub Actions
+
+### Most of the CI time was reinstalling tools the runner already had
+**Symptom:** the Windows PowerShell 5.1 job took about 6 minutes for about 1.5 minutes of tests.
+**Why:** `Install-Module Pester -Force` and `Install-Module PSScriptAnalyzer -Force` ran every
+time. `-Force` reinstalls even when the module is present, and GitHub's Windows image already
+ships both. On 5.1 the two installs alone took about 4 minutes.
+**Fix:** install only if missing (`Get-Module -ListAvailable`, checking the version). No cache was
+needed. The 5.1 job dropped to about 2 minutes 20 seconds.
+
+### Run shell-independent checks once, not once per shell
+**Why:** PSScriptAnalyzer with `PSUseCompatibleSyntax` / `PSUseCompatibleCommands` targeting 5.1
+and 7 is static analysis: it gives the same result whichever shell runs it. Same for building the
+package.
+**Fix:** run lint and the package build in one job only. The other job runs just the tests.
+
+### Fast shell first, slow shell only if it passes
+**Fix:** two jobs instead of a matrix, with the 5.1 job declaring `needs:` on the 7 job, and the
+7 test run set to stop at its first failing test (Pester `Run.SkipRemainingOnFailure = 'Run'`).
+A broken push fails in about 2 minutes and never starts the second machine. A green run still
+tests both shells. Add `concurrency: cancel-in-progress` so a newer push cancels the run it replaces.
+
+### A script that succeeds silently can still "fail" a caller
+**Symptom:** lint printed "clean", then the step failed anyway.
+**Why:** the lint script sets an exit code only on failure (`exit 1`). The caller checked
+`$LASTEXITCODE`, which still held a non-zero value from an earlier native command.
+**Fix:** set `$global:LASTEXITCODE = 0` before calling a child script you judge by its exit code.
+
+### The cache action rejects `..` and only saves on success
+**Symptom:** "Cache not found" on every run, even after green runs.
+**Why:** `actions/cache` saves in its post step only when the job succeeds, and refuses a path
+containing `.` or `..` segments ("Relative pathing '.' and '..' is not allowed"). It also refuses
+to save a path that doesn't exist, and the PowerShell user-module folder isn't always where you
+expect on a runner.
+**Fix:** read the post-step warning before assuming the cache works. Here it turned out no cache
+was needed at all.
+
+### Node 20 is gone from Actions runners
+**Why:** GitHub moved Actions to Node 24 (default from June 2026) and removed Node 20 on
+2026-09-23. Each action's `action.yml` declares its runtime: `actions/cache@v4` says `node20`,
+`@v6` says `node24`. `actions/checkout@v5` is already Node 24.
+**Fix:** check the `using:` line of each action version you reference, and move to the version
+on Node 24.
+
+### Skip docs-only commits, but not docs that are tested
+**Fix:** `paths-ignore` for README, CHANGELOG and notes. Not a blanket `docs/**` when a file under
+`docs/` ships in the package or has tests: its edits must still run CI.
+
+### `.vscode/` in `.gitignore` can't be un-ignored file by file
+**Symptom:** a committed `.vscode/extensions.json` never reaches the repo.
+**Why:** ignoring the directory (`.vscode/`) stops git looking inside it, so a `!` exception for a
+file in it has no effect.
+**Fix:** ignore the contents instead: `.vscode/*`, then `!.vscode/extensions.json` and
+`!.vscode/settings.json`.
+
+---
+
 ## Case study: a local MongoDB replica set on every machine
 
 ### You need a replica set locally, not a standalone `mongod`

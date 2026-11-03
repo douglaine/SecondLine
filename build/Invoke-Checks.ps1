@@ -161,7 +161,7 @@ if ($Stage -contains 'Lint') {
 if ($Stage -contains 'LineEndings') {
     Start-Stage 'LineEndings'
     Import-Module (Join-Path $repo 'SecondLine\SecondLine.psd1') -Force
-    try { Test-SLLineEnding -Path $repo -Depth 0 -Strict }
+    try { $null = Test-SLLineEnding -Path $repo -Depth 0 -Strict }
     catch { Stop-Checks "line endings: $($_.Exception.Message)" }
     finally { Remove-Module SecondLine -ErrorAction SilentlyContinue }
     Complete-Stage ''

@@ -223,8 +223,9 @@ lookup runs.
 
 ## Linting
 
-The module is checked with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer)
-in CI, on both Windows PowerShell 5.1 and PowerShell 7. Run the same check before pushing:
+The module is checked with [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer).
+The settings target both Windows PowerShell 5.1 and PowerShell 7, so the result doesn't depend on
+which shell runs it: CI runs it once, in the PowerShell 7 job. Run the same check before pushing:
 
 ```powershell
 Install-Module PSScriptAnalyzer -Scope CurrentUser   # once
@@ -237,11 +238,36 @@ extension picks up automatically. They include `PSUseCompatibleSyntax` and
 `PSUseCompatibleCommands` for 5.1 and 7, so PowerShell 7-only syntax (`??`, `?.`, ternaries,
 `ForEach-Object -Parallel`) and commands fail the check.
 
+## Checks: CI and before a release
+
+`build/Invoke-Checks.ps1` is the one set of checks, used by CI and by the publish script alike,
+cheapest first, stopping at the first failure:
+
+1. **Lint** (PSScriptAnalyzer), once, since its result is the same in either shell.
+2. **Line endings** of this repo (SecondLine's own `Test-SLLineEnding`).
+3. **Release package** build and validation.
+4. **Tests**, in **PowerShell 7 first**, stopping at the first failing test. **Windows PowerShell
+   5.1 runs the full suite only after 7 passes**, so a broken build is reported in a couple of
+   minutes and never costs a second run.
+
+On GitHub each stage is its own step with its own time and log, and a summary table on the run
+page shows every stage. Pester and PSScriptAnalyzer are installed only if missing (GitHub's Windows
+image already has them). A newer push cancels the run it replaces, and docs-only commits don't run
+CI. The shared policy under `docs/` ships and is tested, so its edits still do.
+
+```powershell
+.\build\Invoke-Checks.ps1                          # everything, in the current shell
+.\build\Invoke-Checks.ps1 -Stage Lint              # one stage
+.\build\Invoke-Checks.ps1 -TestsOnly               # tests only (what the 5.1 pass runs)
+```
+
 ## Releasing
 
 `build/Publish-SecondLine.ps1` runs every release check (manifest, changelog, clean and pushed
-git, tests in a fresh process, package contents), then publishes and tags. Try it with `-WhatIf`
-first: that runs every check and publishes nothing.
+git, then the checks above: PowerShell 7 first, then Windows PowerShell 5.1 if 7 passed, then
+package contents), and only then publishes and tags. If Windows PowerShell 5.1 has no Pester 5.5+,
+that half is skipped locally with the one-time setup command, and CI covers it. Try it with
+`-WhatIf` first: that runs every check and publishes nothing.
 
 `build/Test-SecondLinePackage.ps1` validates the actual package without publishing anything. It
 builds the `.nupkg` with `Compress-PSResource` (PowerShell 7.4+), checks the required assets
