@@ -5,8 +5,13 @@
     Tools = @(
         @{ Name = 'Git'; Command = 'git'; Expect = '2.0'; Rule = 'Minimum' }
         # Only in a repo with .NET in it; SKIPPED elsewhere (a PowerShell repo, say).
-        @{ Name = '.NET SDK selected by this repository'; Command = 'dotnet'; Expect = '10.0'; Rule = 'Minor'
-           AppliesWhen = @('global.json', '*.sln', '*.slnx', '*.csproj', '*.fsproj')
-           Install = 'Add a global.json pinning the SDK: { "sdk": { "version": "10.0.100", "rollForward": "latestFeature", "allowPrerelease": false } }' }
+        @{
+            Name        = '.NET SDK selected by this repository'
+            Command     = 'dotnet'
+            Expect      = '10.0'
+            Rule        = 'Minor'
+            AppliesWhen = @('global.json', '*.sln', '*.slnx', '*.csproj', '*.fsproj')
+            Install     = 'Add a global.json pinning the SDK: { "sdk": { "version": "10.0.100", "rollForward": "latestFeature", "allowPrerelease": false } }'
+        }
     )
 }
