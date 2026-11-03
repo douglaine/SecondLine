@@ -52,6 +52,7 @@ function Test-PesterOk {
 }
 
 # ------------------------------------------------------------ modules --
+# In CI these normally come from the module cache, so nothing is installed.
 $needPssa = -not $TestsOnly -and -not (Get-Module -ListAvailable PSScriptAnalyzer)
 if ($InstallMissing -and ($needPssa -or -not (Test-PesterOk))) {
     # Trusting the Gallery for this user avoids an untrusted-repository prompt,
