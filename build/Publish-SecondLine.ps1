@@ -10,7 +10,7 @@
       2. Changelog      has an entry for this version
       3. Git            clean, pushed, tag free
       4. Gallery        this version isn't already published
-      5. Tests          pass in a fresh PowerShell process
+      5. Lint, tests    PowerShell 7 first (stops at the first failure), then 5.1
       6. Package        stages ONLY the module folder, LICENSE and the shared policy
       7. Publish        API key from SECONDLINE_GALLERY_KEY, a secret vault, or a hidden prompt
       8. Tag            creates and pushes vX.Y.Z
@@ -201,19 +201,36 @@ try {
     Write-Ok "$Version is not on $Repository yet"
 
     # ---------------------------------------------------------- 5. tests --
-    Write-Step '[5] Tests'
+    Write-Step '[5] Lint and tests'
     if ($SkipTests) {
         Write-Info 'Skipped (-SkipTests).'
     }
     else {
-        # Fresh process, so a module already loaded here can't hide a missing import.
-        $exe = (Get-Process -Id $PID).Path
-        $testCmd = "Import-Module Pester -MinimumVersion 5.5; " +
-                   "`$c = New-PesterConfiguration; `$c.Run.Path = 'tests'; `$c.Run.Exit = `$true; " +
-                   "`$c.Output.Verbosity = 'Normal'; Invoke-Pester -Configuration `$c"
-        & $exe -NoProfile -Command $testCmd
-        if ($LASTEXITCODE -ne 0) { Stop-Publish 'Tests failed.' }
-        Write-Ok 'All tests pass'
+        # The same checks CI runs (build\Invoke-Checks.ps1), each in a fresh process so
+        # a module already loaded here can't hide a missing import.
+        # PowerShell 7 first: lint and line endings once, then the tests, stopping at
+        # the first failure. Windows PowerShell 5.1 runs only if 7 passed.
+        $checks = Join-Path $PSScriptRoot 'Invoke-Checks.ps1'
+        $first = (Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+        if (-not $first) { $first = (Get-Process -Id $PID).Path }
+        & $first -NoProfile -File $checks -StopOnFirstFailure -InstallMissing
+        if ($LASTEXITCODE -ne 0) { Stop-Publish "Checks failed in $first. Nothing else was run." }
+        Write-Ok "Lint, line endings and tests pass ($first)"
+
+        $winPs = Get-Command powershell.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($winPs -and $winPs.Source -ne $first) {
+            & $winPs.Source -NoProfile -Command "if (Get-Module -ListAvailable Pester | Where-Object { `$_.Version -ge [version] '5.5' }) { exit 0 } else { exit 3 }"
+            if ($LASTEXITCODE -eq 0) {
+                & $winPs.Source -NoProfile -ExecutionPolicy Bypass -File $checks -TestsOnly
+                if ($LASTEXITCODE -ne 0) { Stop-Publish 'Tests failed in Windows PowerShell 5.1.' }
+                Write-Ok 'Tests pass in Windows PowerShell 5.1'
+            }
+            else {
+                Write-Host -ForegroundColor Yellow ('    WARN  Windows PowerShell 5.1 has no Pester 5.5+, so its tests were skipped here. ' +
+                    'CI runs them on every push. One-time setup, in Windows PowerShell: ' +
+                    'Install-PackageProvider NuGet -Force; Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck')
+            }
+        }
     }
 
     # -------------------------------------------------------- 6. package --

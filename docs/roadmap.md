@@ -11,6 +11,8 @@ Design notes for future work. Released and release-candidate work is in [CHANGEL
 
 ## To do
 
+_CI timing notes: see the 0.4.0 "Faster, cheaper checks" changelog entry._
+
 ### Startup task runner
 
 One entry point, called from `$PROFILE`, that runs a per-machine list of tasks according to a

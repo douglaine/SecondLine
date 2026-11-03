@@ -1,51 +1,81 @@
 name: test
 
+# Docs-only changes don't need two Windows machines. The shared policy under docs/
+# is shipped and tested, so it is deliberately not listed here.
 on:
   push:
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'GOTCHAS.md'
+      - 'docs/roadmap.md'
+      - 'docs/consumer-migration.md'
   pull_request:
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'GOTCHAS.md'
+      - 'docs/roadmap.md'
+      - 'docs/consumer-migration.md'
 
+# A newer push to the same branch cancels the run it replaces.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+# Each stage is its own step, so the run page shows which one is running or failed,
+# with its own time and log. The Summary step adds one table of every stage.
 jobs:
-  pester:
-    name: Pester (${{ matrix.shell }})
+  # PowerShell 7 first: it's the faster shell, it runs the shell-independent checks
+  # once (lint, line endings, package), and it stops at the first failing test.
+  pwsh:
+    name: Pester (pwsh)
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shell: [powershell, pwsh]   # Windows PowerShell 5.1 and PowerShell 7
     defaults:
       run:
-        shell: ${{ matrix.shell }}
+        shell: pwsh
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install Pester 5
-        run: |
-          Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
+      # GitHub's Windows image already has Pester 5 and PSScriptAnalyzer. This only
+      # installs what's missing; the old workflow reinstalled both every run (minutes).
+      - name: Modules
+        run: ./build/Invoke-Checks.ps1 -Stage Modules -InstallMissing
 
-      - name: Lint (PSScriptAnalyzer)
-        run: |
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
-          $findings = @(Invoke-ScriptAnalyzer -Path ./SecondLine -Recurse -Settings ./PSScriptAnalyzerSettings.psd1)
-          if ($findings.Count -gt 0) {
-            $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize -Wrap | Out-String -Width 200 | Write-Host
-          }
-          $bad = @($findings | Where-Object { 'Error', 'Warning' -contains "$($_.Severity)" })
-          if ($bad.Count -gt 0) { Write-Error "PSScriptAnalyzer: $($bad.Count) finding(s)."; exit 1 }
+      - name: Lint
+        run: ./build/Invoke-Checks.ps1 -Stage Lint
 
-      - name: Repository conventions (dogfood)
-        run: |
-          Import-Module ./SecondLine/SecondLine.psd1
-          Test-SLLineEnding -Path . -Depth 0 -Strict
+      - name: Line endings
+        run: ./build/Invoke-Checks.ps1 -Stage LineEndings
 
-      - name: Validate release package
-        run: ./build/Test-SecondLinePackage.ps1
+      - name: Package
+        run: ./build/Invoke-Checks.ps1 -Stage Package
 
-      - name: Run tests
-        run: |
-          Import-Module Pester -MinimumVersion 5.5
-          $cfg = New-PesterConfiguration
-          $cfg.Run.Path = 'tests'
-          $cfg.Run.Exit = $true
-          $cfg.Output.Verbosity = 'Detailed'
-          Invoke-Pester -Configuration $cfg
+      - name: Tests (stop at first failure)
+        run: ./build/Invoke-Checks.ps1 -Stage Tests -StopOnFirstFailure
+
+      - name: Summary
+        if: always()
+        run: ./build/Invoke-Checks.ps1 -Stage Summary
+
+  # Windows PowerShell 5.1 runs only after 7 passes, so a broken push never starts
+  # this machine. It runs the full test suite; the static checks already ran above.
+  powershell:
+    name: Pester (powershell)
+    needs: pwsh
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Modules
+        run: ./build/Invoke-Checks.ps1 -Stage Modules -TestsOnly -InstallMissing
+
+      - name: Tests
+        run: ./build/Invoke-Checks.ps1 -Stage Tests
+
+      - name: Summary
+        if: always()
+        run: ./build/Invoke-Checks.ps1 -Stage Summary
