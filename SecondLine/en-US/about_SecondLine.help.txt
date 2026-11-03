@@ -1,0 +1,97 @@
+TOPIC
+    about_SecondLine
+
+SHORT DESCRIPTION
+    SecondLine keeps developer tools and repository conventions in step.
+
+LONG DESCRIPTION
+    Start with Show-SLHelp for the loaded version, the applicable configuration,
+    the version policy and an automatically discovered command catalog. An
+    exported command with comment-based help joins that catalog automatically;
+    there is no separate manual list.
+
+    Show-SLHelp -Command <name> displays full help. It never runs that command.
+    Get-Help <command> -Examples shows usage examples.
+
+CONFIGURATION
+    Standards are PowerShell data files. Resolution order: an explicit -Path on
+    standard-aware commands, then SECONDLINE_STANDARD, then the nearest
+    secondline.standard.psd1 in the current folder or its parents.
+
+    Extends names one parent, relative to the declaring file or absolute.
+    Extends = '@development' loads the baseline from this installed package.
+    Child tools replace complete entries by Name. Git profiles, repository
+    mappings, ModuleVersions and Updates merge by key. Missing parents and
+    inheritance cycles are errors.
+
+    Settings layers (Get-SLSetting shows each value and its source):
+      ModuleVersions  machine < user < project chain (nearest file wins).
+                      The project's approved version always wins.
+      Updates         defaults < project < machine < user. These are personal
+                      notice preferences and never change an approved version.
+    Machine: CommonApplicationData\SecondLine\settings.psd1
+    User:    ApplicationData\SecondLine\settings.psd1
+    Both are ignored in CI and with SECONDLINE_NO_HOST_SETTINGS=1.
+
+APPROVED VERSION BEFORE IMPORT
+    A loaded module cannot choose its own version. Projects pin
+    ModuleVersions = @{ SecondLine = '0.4.0' } in their standard. Their scripts
+    run a vendored copy of Bootstrap\Import-SecondLine.ps1 before anything
+    imports SecondLine:
+        & "$PSScriptRoot\Import-SecondLine.ps1" -Path $PSScriptRoot
+    The bootstrap imports exactly that version, refuses to swap a different
+    loaded version, and never installs anything.
+
+COMMANDS
+    Show-SLHelp discovers the actual exports and their help automatically.
+    Test commands audit. Set and Repair commands may change files, and support
+    -WhatIf. Start and Stop commands change MongoDB state. Reading help never
+    runs those operations.
+
+VERSION CHECKS
+    One update cache per user per machine (LocalApplicationData\SecondLine)
+    is shared by Show-SLHelp, Invoke-SLUpdateCheck and the opt-in profile
+    block. A lock prevents duplicate lookups across sessions.
+      - Lookups refresh daily and use stable releases only.
+      - Each request times out after 3 s and is retried once. A failure backs
+        off for 60 minutes. Offline or failed results are reported as
+        unknown, never as up to date.
+      - Show-SLHelp starts a background lookup only when the cached result is
+        not current, and never waits for it. -CheckForUpdates forces a
+        refresh. -NoUpdateCheck starts none.
+      - Get-SLUpdateStatus is offline. It keeps update availability,
+        version-policy mismatch and security advisories apart. Advisories are
+        NotConfigured: there is no advisory source.
+      - Each notice appears once.
+      - Checks are off in CI and with SECONDLINE_NO_UPDATE_CHECK=1.
+      - Nothing is ever installed.
+    Opt in with Enable-SLProfileUpdateCheck -Path $PROFILE.CurrentUserAllHosts.
+    Remove it with Disable-SLProfileUpdateCheck.
+
+LINE ENDINGS
+    Test-SLLineEnding compares the effective .gitattributes, applicable
+    .editorconfig files and explicit VS Code files.eol settings with the
+    actual working copies and Git's stored copy. Repair-SLLineEnding converts
+    endings only, preserving encoding and content, and never stages.
+
+SHARED POLICY AND CHECKPOINTS
+    Export-SLPolicy writes the reviewed, hash-verified shared policy into a
+    repository. New-SLStatusCheckpoint creates docs/status/current.md.
+    Test-SLPolicyReference audits the CLAUDE.md and AGENTS.md entry points,
+    the policy copy and the checkpoint. A checkpoint is a handoff to verify,
+    never an authorization.
+
+EXAMPLES
+    Show-SLHelp
+    Show-SLHelp -Command Start-SLMongo
+    Get-SLSetting
+    Get-SLUpdateStatus
+    Test-SLLineEnding -Path . -Strict
+    Test-SLPolicyReference -Path . -Strict
+
+SEE ALSO
+    Show-SLHelp
+    Get-SecondLineStandard
+    Get-SLSetting
+    Test-SLLineEnding
+    Test-SLPolicyReference

@@ -2,14 +2,80 @@
 
 All notable changes to SecondLine. Versions follow [Semantic Versioning](https://semver.org).
 
-## Unreleased
+## 0.4.0 - Unreleased (release candidate)
+
+Headline: **one rulebook for every AI coding agent.** `CLAUDE.md` and `AGENTS.md` in every repo point at the same versioned, hash-stamped rules, with a handoff note per repo, and one command audits them all. Also: one approved SecondLine version per project, one shared update check, and line endings checked end to end. Minor version: these are new, backward-compatible features. Nothing from 0.3.0 changes incompatibly.
 
 ### Added
 
+- `Show-SLHelp` (built separately at the user's request and kept here):
+  - A catalog of commands and their help synopses, discovered from the module's exports, plus the configuration and the version policy, and detailed help for one command. It never runs a listed command.
+  - `about_SecondLine`.
+  - Opening help reads the shared update cache and, when the result isn't current, starts one background lookup without waiting for it. `-NoUpdateCheck` opts out. `-CheckForUpdates` forces a background refresh.
+- One shared update service (`Invoke-SLUpdateCheck`, `Get-SLUpdateStatus`), replacing the session-only cache in the help work:
+  - A per-user, per-machine cache in LocalApplicationData\SecondLine (or `SECONDLINE_CACHE_DIR`), with atomic writes.
+  - A lock file, so concurrent shells and help calls don't repeat a lookup.
+  - A daily refresh by default.
+  - A three-second timeout and one retry by default, and a 1 MB response limit.
+  - A 60-minute failure backoff shared across sessions.
+  - Only the PowerShell Gallery is queried, only for SecondLine, and only stable releases by default.
+  - The status separates update availability, version-policy mismatch, and security advisories. Advisories are reported as not configured: no advisory source exists, and none is invented.
+  - A failed or offline lookup is reported as unknown, never as up to date.
+  - Each notice is shown once, for example `SecondLine 0.4.1 available; installed 0.4.0.` Nothing is ever installed.
+- `Enable-SLProfileUpdateCheck` and `Disable-SLProfileUpdateCheck` (opt-in, `-WhatIf`, explicit `-Path`) add or remove one marked profile block:
+  - The block imports nothing into the shell, so project version selection still works afterwards.
+  - It shows a pending notice and, when the shared cache is due, starts one hidden, no-profile process that runs the shared check.
+  - Other profile bytes, the encoding, the BOM and the line endings are kept. Duplicate blocks are collapsed, and removal is clean.
+- Layered settings and approved module versions:
+  - `ModuleVersions` and `Updates` sections in standards, merged by key through `Extends`.
+  - Machine and user `settings.psd1` files.
+  - `Get-SLSetting` shows each value's source and what it overrode.
+  - A project's `ModuleVersions` always wins over personal values. Update preferences are personal.
+  - In CI, or with `SECONDLINE_NO_HOST_SETTINGS=1`, machine and user files are ignored.
+- `Bootstrap/Import-SecondLine.ps1` selects the approved version before import:
+  - It follows nearest-parent discovery and `Extends`, with relative paths resolved and cycles detected.
+  - It imports the version with `-RequiredVersion`.
+  - It refuses to swap an already loaded different version.
+  - It never installs anything, and explains how to install a missing version.
+  - The module dot-sources the same file, so there is one implementation.
+- `Test-SLLineEnding` (read-only, `-Strict` for CI) audits:
+  - effective `.gitattributes`
+  - local and parent `.editorconfig` files, up to `root = true`, with full glob support
+  - explicit VS Code `files.eol` settings, global and per-language, in `.vscode/settings.json` and `*.code-workspace` (JSONC)
+  - actual working-copy endings, including mixed files
+  - Git's stored normalization, reported separately
+
+  Binary files are skipped. Intentional CRLF is respected.
+- `Repair-SLLineEnding` (`-WhatIf`, `-File`, `-Scope`):
+  - It converts only line endings, byte-for-byte, keeping the encoding, BOM, content and a missing final newline, and verifies the result before an atomic write.
+  - Files with uncommitted edits are skipped unless `-AllowModified`.
+  - It makes `.editorconfig` and VS Code settings agree with `.gitattributes` only where that is provably safe, and reports the rest as manual work.
+  - It never stages.
+- One rulebook for every AI coding agent:
+  - `docs/shared-development-policy.md` now has a version header with a SHA-256, so copies can be verified offline. It ships in the package as `Policy/shared-development-policy.md`.
+  - `Export-SLPolicy` writes a reviewed copy into a repo. It never edits CLAUDE.md or AGENTS.md, and it refuses to overwrite a modified copy unless `-Force`.
+  - `New-SLStatusCheckpoint` creates `docs/status/current.md` from the shipped template.
+  - `Test-SLPolicyReference` audits:
+    - entry points that are missing or differ
+    - missing, broken, non-portable or outdated policy references
+    - modified copies
+    - the checkpoint's required sections, and credential-like content in it
+    - outdated bootstrap copies and hardcoded `Import-Module SecondLine -RequiredVersion`
+- Status checkpoint convention (`docs/status/current.md`) in the shared policy and in both entry points. A checkpoint is a handoff to verify, never an authorization.
+- `build/Build-SecondLinePackage.ps1` stages exactly the shipped files. `Publish-SecondLine.ps1` now uses it.
+- `build/Test-SecondLinePackage.ps1` builds the real `.nupkg` (with `Compress-PSResource`), checks the required assets and the excluded development files, and smoke-tests the extracted package. It publishes nothing.
+- `build/Update-PolicyHeader.ps1` updates the policy header after a reviewed edit.
 - `AppliesWhen` on a tool: a list of file patterns. The tool is only checked in a git repo that
   contains a matching file (or, outside a repo, a folder that has one), and is reported as
   `SKIPPED` elsewhere. `SKIPPED` isn't a failure: the summary counts only the tools checked,
   and `-Strict` ignores it.
+- VS Code workspace files for working on SecondLine: recommended extensions (PowerShell,
+  Pester Tests) and the repo's PSScriptAnalyzer settings wired into the editor.
+
+### Changed
+
+- A standard is valid with only `ModuleVersions` or `Updates`.
+- Standard discovery and `Extends` resolution moved into the bootstrap file, shared by the module and the pre-import loader. The behavior and error messages are unchanged.
 
 ### Fixed
 

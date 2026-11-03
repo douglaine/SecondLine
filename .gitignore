@@ -15,3 +15,7 @@ ci-failed.log
 Thumbs.db
 .DS_Store
 *.tmp
+
+# Local working notes, not part of the project
+tasks/
+docs/status/

@@ -8,6 +8,10 @@ Declare the tool versions your machines should run in **one file**, then audit e
 against it. When something's off, the report tells you what's wrong and how to fix it.
 It also checks that every git repo on the machine follows the same line-ending rules.
 
+**New in 0.4.0:** [one rulebook for every AI coding agent](#one-rulebook-for-every-ai-coding-agent-040).
+Keep `CLAUDE.md` and `AGENTS.md` in every repo pointed at the same versioned rules, and audit
+them all in one command.
+
 ```
   SecondLine - Example standard v1.0.0
   C:\src\myproject\secondline.standard.psd1
@@ -210,7 +214,12 @@ Needs `mlaunch` (`pip install mtools`) and `mongosh` on PATH.
 ```powershell
 Test-SecondLine -PassThru -Quiet | Where-Object Status -ne 'OK'
 Test-SecondLine -Strict        # throws if anything isn't OK
+Test-SLLineEnding -Path . -Strict       # line-ending rules and working copies
+Test-SLPolicyReference -Path . -Strict  # agent entry points, policy copy, checkpoint
 ```
+
+Checks are deterministic in CI: machine and user settings are ignored there, and no update
+lookup runs.
 
 ## Linting
 
@@ -233,6 +242,11 @@ extension picks up automatically. They include `PSUseCompatibleSyntax` and
 `build/Publish-SecondLine.ps1` runs every release check (manifest, changelog, clean and pushed
 git, tests in a fresh process, package contents), then publishes and tags. Try it with `-WhatIf`
 first: that runs every check and publishes nothing.
+
+`build/Test-SecondLinePackage.ps1` validates the actual package without publishing anything. It
+builds the `.nupkg` with `Compress-PSResource` (PowerShell 7.4+), checks the required assets
+(help, bootstrap, shared policy, status template, standards and profiles) and the excluded
+development files, then imports the extracted package in a fresh process.
 
 The PowerShell Gallery API key comes from `SECONDLINE_GALLERY_KEY` if set, else from a secret
 vault, else a hidden prompt. To store the key once instead of pasting it every release:
@@ -296,3 +310,219 @@ When no `-Path` or `SECONDLINE_STANDARD` is supplied, SecondLine searches the cu
 `@development` resolves to the baseline inside the installed SecondLine package. Other `Extends` values are absolute paths or paths relative to the declaring file, for example `../secondline.standard.psd1`. One parent is supported per file; parents may themselves extend another standard. Missing parents and circular inheritance are errors (maximum chain: 64 files).
 
 Child tools replace complete parent entries with the same `Name`, case-insensitively; other parent tools remain. Child metadata overrides parent metadata. `GitAttributes.Profiles` and `GitAttributes.Repos` merge by key, with child values winning. Inheritance reads data files only and installs or starts nothing.
+
+## Help front door (0.4.0)
+
+```powershell
+Show-SLHelp                       # version, configuration, version policy, command catalog
+Show-SLHelp -Command Stop-SLMongo # full help for one command; never runs it
+Show-SLHelp -CheckForUpdates      # force a background refresh
+Show-SLHelp -NoUpdateCheck        # start no check (offline, automation)
+Get-Help about_SecondLine
+```
+
+The catalog is discovered from the loaded module's exports and each command's own help
+synopsis, so new exported commands appear automatically. A missing or invalid configuration
+doesn't stop help from working.
+
+Opening help reads the shared update cache (see below). If that result isn't current, help
+starts one background lookup and returns at once. A newer-version notice appears when the
+lookup finishes. Up-to-date results stay quiet. Help never installs anything.
+
+## Approved SecondLine version per project (0.4.0)
+
+A project approves its SecondLine version once, in its standard, instead of every script
+hardcoding `Import-Module SecondLine -RequiredVersion ...`:
+
+```powershell
+# secondline.standard.psd1 at the project root
+@{
+    Extends        = '@development'
+    ModuleVersions = @{ SecondLine = '0.4.0' }
+}
+```
+
+Subprojects inherit it through nearest-parent discovery or `Extends`. A nearer file can
+pin a different version. A loaded module can't choose its own version, so scripts select it
+**before** import with the bootstrap. Copy `SecondLine/Bootstrap/Import-SecondLine.ps1` from
+the approved package into the repo (for example `build/Import-SecondLine.ps1`), then:
+
+```powershell
+& "$PSScriptRoot\Import-SecondLine.ps1" -Path $PSScriptRoot
+```
+
+The bootstrap reads data files only, imports exactly the approved version, and refuses to
+swap an already loaded different version. It never installs anything: if the version is
+missing, it prints the install command for you to review.
+
+### Settings layers
+
+| Section | Precedence (lowest first) | Purpose |
+|---|---|---|
+| `ModuleVersions` | machine < user < project chain (root parent < ... < nearest file) | execution policy: a project value always wins |
+| `Updates` | defaults < project chain < machine < user | notification preferences: personal, never change a version |
+
+Machine settings live in `CommonApplicationData\SecondLine\settings.psd1`
+(`SECONDLINE_MACHINE_SETTINGS`), and user settings in
+`ApplicationData\SecondLine\settings.psd1` (`SECONDLINE_USER_SETTINGS`). Both use the same
+sections. In CI (`CI`, `GITHUB_ACTIONS` or `TF_BUILD`), or with
+`SECONDLINE_NO_HOST_SETTINGS=1`, those two files are ignored, so CI depends only on the
+repository. `Get-SLSetting` shows every value, its source and what it overrode.
+`Get-SLSetting -NoHostSettings` shows what CI sees.
+
+Publishing a release, installing it, being notified about it, and approving it for a project
+are four separate steps. A new Gallery release never changes a project's approved version.
+
+## Update notices (0.4.0)
+
+```powershell
+Get-SLUpdateStatus             # offline: update, version policy, advisories, from the cache
+Invoke-SLUpdateCheck           # explicit refresh (bounded); prints one line
+Invoke-SLUpdateCheck -Force    # refresh even if the cache is current or backing off
+```
+
+- **One cache, shared:** one per user per machine, in `LocalApplicationData\SecondLine`
+  (`SECONDLINE_CACHE_DIR`). Every session, project and help call shares it.
+- **Writes and locking:** writes are atomic, and a lock file stops concurrent sessions from
+  repeating a lookup.
+- **Requests:** stable releases only by default. Results refresh daily (`Updates.RefreshHours`).
+  Each request times out after 3 s (`TimeoutSeconds`) and is retried once (`Retries`), with a
+  1 MB response limit. A failure backs off for 60 minutes (`FailureBackoffMinutes`).
+- **What is checked:** only SecondLine, only on the PowerShell Gallery.
+- **Results:** `Get-SLUpdateStatus` keeps three categories apart:
+  - update available
+  - version-policy mismatch: the loaded version is not the one the project approves
+  - security advisory: always `NotConfigured`, because there is no advisory source and
+    SecondLine doesn't invent one
+
+  A failed or offline lookup reports `Failed` and unknown, never up to date.
+- **Notices:** each actionable notice, such as `SecondLine 0.4.1 available; installed 0.4.0.`,
+  is shown once.
+- **Turning checks off:** checks are off in CI and with `SECONDLINE_NO_UPDATE_CHECK=1`.
+
+### Optional profile integration
+
+Nothing is added to your profile unless you run this yourself:
+
+```powershell
+Enable-SLProfileUpdateCheck -Path $PROFILE.CurrentUserAllHosts -WhatIf   # preview
+Enable-SLProfileUpdateCheck -Path $PROFILE.CurrentUserAllHosts
+Disable-SLProfileUpdateCheck -Path $PROFILE.CurrentUserAllHosts          # remove it again
+```
+
+The block between `# >>> SecondLine update check >>>` and `# <<< SecondLine update check <<<`
+runs only in interactive shells. It shows a pending notice, if there is one. When the shared
+cache is due, it starts one hidden, no-profile PowerShell that runs `Invoke-SLUpdateCheck` and
+exits. Startup reads two small files and never waits on the network.
+
+The block doesn't import SecondLine into your shell, so project bootstraps can still select
+their approved version. Running Enable again updates the block in place. Other profile
+content, the encoding and the line endings are kept. No scheduled task or service is
+registered.
+
+## Line endings, end to end (0.4.0)
+
+```powershell
+Test-SLLineEnding -Path C:\src            # report (read-only)
+Test-SLLineEnding -Path . -Strict         # CI: throws if any repo has an issue
+Repair-SLLineEnding -Path C:\src\MyApp -WhatIf
+Repair-SLLineEnding -Path C:\src\MyApp -File build/Run.ps1 -Scope Files
+```
+
+`Test-SLLineEnding` compares three things for tracked files and untracked files that aren't
+ignored:
+
+- **Rules:** the effective `.gitattributes`, as git computes it; the applicable `.editorconfig`
+  files, local and parent, up to `root = true`; and explicit VS Code `files.eol` settings,
+  global or per-language, in `.vscode/settings.json` and `*.code-workspace`.
+- **The working copy:** the endings actually in each file.
+- **Git's stored copy.**
+
+It reports `Mixed`, `WrongEnding`, `EditorConfigConflict`, `VSCodeConflict` and `Renormalize`
+(stored with CRLF). A `.gitattributes` eol is the rule. Without one, `.editorconfig`
+`end_of_line` is. Without either, a file only has to be consistent. Binary files are skipped,
+and intentional CRLF (for example `*.ps1 eol=crlf`) is respected.
+
+`Repair-SLLineEnding` converts line endings only, byte for byte. Encoding, BOM, content and a
+missing final newline stay as they were, and the result is checked before an atomic write.
+Tracked files with uncommitted edits are skipped unless `-AllowModified`. It also makes
+`.editorconfig` and VS Code settings agree with `.gitattributes`, only where every affected
+file provably agrees. Anything else is listed as manual work. It never stages: Git's stored
+copy is renormalized by `Set-SLGitAttributes`.
+
+Limits: VS Code applies `files.eol` to new files only, and user-level settings and
+`files.associations` are not read. Editors don't control scripts or generators: those must
+write the declared endings explicitly.
+
+## One rulebook for every AI coding agent (0.4.0)
+
+**Claude Code reads `CLAUDE.md`. Codex and most other agents read `AGENTS.md`. Every repo you own
+needs both, they need to say the same thing, and they need to stay current. SecondLine keeps all
+of that in step, the same way it keeps your tools in step.**
+
+The ground rules you want every agent to follow are almost always the same, whatever the repo:
+don't commit or publish without being asked, preserve uncommitted work, respect line endings,
+write down where you stopped so the next session can pick up. Projects add their own rules on
+top. The hard part isn't writing those rules once. It's keeping them identical across a dozen
+repos and two agents for months.
+
+### Doing it by hand
+
+Here's what that takes without SecondLine:
+
+1. **Write the shared rules.** Put them in a file somewhere, say a `rules.md` in a notes folder.
+2. **Copy them into every repo.** Paste them into each repo's `CLAUDE.md`, then paste them again
+   into `AGENTS.md`, below whatever project-specific instructions are already there. Twelve repos,
+   twenty-four files.
+3. **Keep the pairs identical.** Every time you tweak a project rule in `CLAUDE.md`, remember to
+   make the same edit in `AGENTS.md`. Otherwise the two agents quietly follow different rules in
+   the same repo, and you find out when one of them does something the other never would.
+4. **Change a shared rule.** Open all twenty-four files and edit each one, without disturbing the
+   project-specific lines around it. Miss one and that repo is running last month's rules.
+5. **Figure out which copy is current.** Six weeks later, three repos have slightly different
+   wording. Which one is right? Nothing says. You diff them by eye and guess.
+6. **Don't point at your own folder.** The tempting shortcut is a line like "read
+   `C:\Users\me\notes\rules.md`". It works on your laptop, fails on your other machine, and fails
+   in CI, where nobody has your folder.
+7. **Keep a handoff note.** Agents work best when each session starts from a short record of
+   where the last one stopped: branch, what's done, what's left, what was actually verified.
+   By hand, that's a file you have to remember to create in every repo, keep the same shape,
+   and keep secrets out of.
+8. **Check all of it, regularly.** Go repo by repo: are both files there? Do they match? Is the
+   rules copy current? Is the handoff note complete? Is there a pasted token in it?
+
+Most people give up around step 4, and the drift starts.
+
+### Doing it with SecondLine
+
+```powershell
+Export-SLPolicy        -Path C:\src\MyApp            # drop in the versioned, hash-stamped rulebook
+New-SLStatusCheckpoint -Path C:\src\MyApp            # start the handoff note from the template
+Test-SLPolicyReference -Path C:\src -Strict          # audit every repo under C:\src at once
+```
+
+Each repo's `CLAUDE.md` and `AGENTS.md` keep their own project instructions, with two marker lines
+at the top that point both agents at the same shared rulebook and handoff note:
+
+```text
+SecondLine-Policy: 1 docs/shared-development-policy.md
+SecondLine-Status: docs/status/current.md
+```
+
+What you get:
+
+- **One rulebook, versioned.** The copy in each repo carries its version and a SHA-256 on its first
+  line, so anyone (or CI) can verify it offline, with no path to anyone's machine.
+- **Both agents, same rules.** The audit flags a repo where `CLAUDE.md` and `AGENTS.md` have drifted
+  apart, or where one is missing.
+- **Updates you control.** `Export-SLPolicy` never edits your entry points, and it refuses to
+  overwrite a copy someone changed locally. A modified copy is reported, not silently replaced.
+- **A handoff note with a fixed shape.** `docs/status/current.md` records the branch and base
+  commit, what's done and what's left, changed files, checks labelled `Verified` or `Planned`
+  with evidence, blockers, and the exact next action. It's a record to check, never permission to
+  proceed, and the audit flags anything in it that looks like a credential.
+- **Your whole machine in one sweep.** `Test-SLPolicyReference` reports missing or differing entry
+  points, broken, non-portable, modified or outdated rulebook references, incomplete handoff
+  notes, and hardcoded SecondLine versions, for every repo under a folder.
+
+Adopting it in an existing repo, step by step: [docs/consumer-migration.md](docs/consumer-migration.md).

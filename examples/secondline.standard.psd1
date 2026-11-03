@@ -25,7 +25,12 @@
 #   Profiles        add a line-ending profile, or replace a built-in one (docs, powershell,
 #                   dotnet), as a list of .gitattributes lines
 #   Repos           repo folder name -> profile, instead of auto-detection
-# A standard needs Tools, GitAttributes, or both.
+# ModuleVersions (optional): the SecondLine version this project approves. Scripts select it
+#   before import with a vendored Bootstrap\Import-SecondLine.ps1. Subprojects inherit it.
+#   ModuleVersions = @{ SecondLine = '0.4.0' }
+# Updates (optional): suggested update-notice settings; users can override them for themselves.
+#   Updates = @{ RefreshHours = 24 }
+# A standard needs Tools, GitAttributes, ModuleVersions or Updates.
 
 @{
     Name    = 'Example standard'
