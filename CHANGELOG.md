@@ -78,8 +78,11 @@ Headline: **one rulebook for every AI coding agent.** `CLAUDE.md` and `AGENTS.md
   cheapest first (lint, line endings, package, then tests). PowerShell 7 runs first and stops
   at the first failing test; Windows PowerShell 5.1 runs the full suite only after 7 passes.
   Lint, line endings and the package are checked once, since they don't depend on the shell.
-  CI caches its PowerShell modules (installing them took about four minutes of each 5.1
-  run), cancels a run when a newer push replaces it, and skips docs-only changes.
+  CI shows each stage as its own step with a summary table, installs Pester and
+  PSScriptAnalyzer only when missing (it used to reinstall them every run, about four minutes
+  of each 5.1 run, though GitHub's Windows image already has them), cancels a run when a newer
+  push replaces it, and skips docs-only changes. The 5.1 job went from about 6 minutes to
+  about 2.
 - A standard is valid with only `ModuleVersions` or `Updates`.
 - Standard discovery and `Extends` resolution moved into the bootstrap file, shared by the module and the pre-import loader. The behavior and error messages are unchanged.
 
