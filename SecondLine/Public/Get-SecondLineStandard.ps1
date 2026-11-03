@@ -16,7 +16,17 @@ function Get-SecondLineStandard {
               Repos    = @{ 'docs-site' = 'docs' }
           }
 
-        A standard needs Tools, GitAttributes, or both.
+        It can pin the SecondLine version the project approves (and other
+        modules), and suggest update-notice defaults. Both sections merge by key
+        through Extends, with the child's values winning:
+
+          ModuleVersions = @{ SecondLine = '0.4.0' }
+          Updates        = @{ RefreshHours = 24 }
+
+        ModuleVersions is chosen before import by Bootstrap\Import-SecondLine.ps1.
+        See Get-SLSetting for every layer and where each value comes from.
+
+        A standard needs Tools, GitAttributes, ModuleVersions or Updates.
 
         A tool can have AppliesWhen, a list of file patterns. Then it is only
         checked in a git repo that contains a matching file (outside a repo: in a
@@ -59,8 +69,25 @@ function Get-SecondLineStandard {
 
     $problems = New-Object System.Collections.Generic.List[string]
     $hasTools = $data.ContainsKey('Tools') -and $null -ne $data.Tools -and @($data.Tools).Count -gt 0
-    if (-not $hasTools -and -not $data.ContainsKey('GitAttributes')) {
-        $problems.Add("'Tools' is missing or empty. Add at least one tool, or a GitAttributes section.")
+    $hasSection = @('GitAttributes', 'ModuleVersions', 'Updates' | Where-Object { $data.ContainsKey($_) }).Count -gt 0
+    if (-not $hasTools -and -not $hasSection) {
+        $problems.Add("'Tools' is missing or empty. Add at least one tool, or a GitAttributes, ModuleVersions or Updates section.")
+    }
+    $moduleVersions = @{}
+    if ($data.ContainsKey('ModuleVersions')) {
+        if ($data.ModuleVersions -isnot [hashtable]) { $problems.Add("'ModuleVersions' must be @{ ModuleName = '1.2.3' }.") }
+        else {
+            foreach ($key in $data.ModuleVersions.Keys) {
+                $value = "$($data.ModuleVersions[$key])"
+                if ($value -notmatch '^\d+(\.\d+){1,3}$') { $problems.Add("ModuleVersions.$key is '$value', which is not a version like 0.4.0.") }
+                else { $moduleVersions["$key"] = $value }
+            }
+        }
+    }
+    $updates = @{}
+    if ($data.ContainsKey('Updates')) {
+        foreach ($problem in @(Test-SLUpdateSettings -Settings $data.Updates -Label 'Updates')) { $problems.Add($problem) }
+        if ($data.Updates -is [hashtable]) { $updates = $data.Updates }
     }
 
     $tools = @()
@@ -131,10 +158,12 @@ function Get-SecondLineStandard {
     if ($data.Version) { $version = "$($data.Version)" }
 
     [pscustomobject]@{
-        Name          = $name
-        Version       = $version
-        Path          = $Path
-        Tools         = $tools
-        GitAttributes = $gitAttributes
+        Name           = $name
+        Version        = $version
+        Path           = $Path
+        Tools          = $tools
+        GitAttributes  = $gitAttributes
+        ModuleVersions = $moduleVersions
+        Updates        = $updates
     }
 }

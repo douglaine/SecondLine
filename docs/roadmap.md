@@ -1,16 +1,13 @@
-# SecondLine status
+# SecondLine roadmap
 
-Where the project stands and what's next. Released work is in [CHANGELOG.md](../CHANGELOG.md).
+Design notes for future work. Released and release-candidate work is in [CHANGELOG.md](../CHANGELOG.md).
 
 ## Current
 
-- **0.3.0** (2026-10-21) on the PowerShell Gallery: standards with parent-folder discovery and
-  `Extends` inheritance (including the shipped `@development` baseline), repo line-ending checks
-  and fixes (`Test-SLRepo`, `Set-SLGitAttributes`), PSScriptAnalyzer in CI.
-  - 0.3.0 was released from `feature/repo-line-endings` (tagged `v0.3.0`) and is not merged into
-    `main` yet. `main` still carries 0.2.0 code.
-- **0.2.0** (2026-10-18): local MongoDB replica-set commands (`Start-/Stop-/Get-SLMongoStatus`,
-  `Find-SLMongoReplicaSet`).
+- **0.3.0** (2026-10-21) is on the PowerShell Gallery.
+- **0.4.0** (release candidate): shared update service, opt-in profile update check, layered
+  settings and approved module versions, line-ending audit and repair, shared instructions for
+  AI coding agents, help, `AppliesWhen`.
 
 ## To do
 
@@ -68,19 +65,12 @@ config file, without slowing or blocking the shell.
   - If the old version folder is gone (`Uninstall-Module -AllVersions`, manual cleanup), there's
     nothing to roll back to: report it and run no tasks.
   - Rollback is only for upgrade failures. An ordinary task failure is the crash guard's job.
-- **Update check against the PowerShell Gallery:** a built-in check task (off by default, at
-  most daily) asks the Gallery for the newest published SecondLine and compares it with the
-  installed version. If newer, the next prompt shows "SecondLine 0.3.0 available". Read-only:
-  nothing about the machine is sent, and there's no server of our own.
-  - Use `Find-PSResource` (PSResourceGet, built into PowerShell 7.4+) when present; fall back to
-    `Find-Module` on 5.1.
-  - On 5.1, an old PowerShellGet can stop and ask to install the NuGet provider. In a
-    background job that prompt hangs forever, so if the provider is missing, skip the check and
-    report it instead of calling `Find-Module`.
-  - 5.1 may also need TLS 1.2 enabled for the session to reach the Gallery.
-  - Offline or slow: the job times out quietly and tries again next day. It never delays a shell.
-  - The check only reports. Installing stays a deliberate `Update-Module`, and the safe-mode
-    first run and rollback take over from there.
+- **Update check against the PowerShell Gallery:** done in 0.4.0 (`Invoke-SLUpdateCheck`,
+  `Get-SLUpdateStatus`, `Enable-SLProfileUpdateCheck`: shared per-user cache, daily refresh,
+  timeouts, failure backoff, notice shown once, nothing installed). The startup runner should
+  reuse that service as its first check task rather than add a second one.
+- **Per-machine settings:** 0.4.0 already has machine and user `settings.psd1` layers
+  (`Get-SLSetting`). Task on/off switches belong there or in the standard, not in a new file.
 - **Crash guard:** a task that fails or times out on two starts in a row is marked suspended and
   skipped until the user clears it (`Resume-SLTask <name>`), so one broken task can't break
   every shell.

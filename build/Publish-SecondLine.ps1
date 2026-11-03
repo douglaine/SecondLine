@@ -11,7 +11,7 @@
       3. Git            clean, pushed, tag free
       4. Gallery        this version isn't already published
       5. Tests          pass in a fresh PowerShell process
-      6. Package        stages ONLY the module folder plus LICENSE
+      6. Package        stages ONLY the module folder, LICENSE and the shared policy
       7. Publish        API key from SECONDLINE_GALLERY_KEY, a secret vault, or a hidden prompt
       8. Tag            creates and pushes vX.Y.Z
       9. Visibility     offers to make the GitHub repo public (asks first)
@@ -219,10 +219,8 @@ try {
     # -------------------------------------------------------- 6. package --
     Write-Step '[6] Package contents'
     $stage = Join-Path ([IO.Path]::GetTempPath()) ('SecondLine-publish-' + [guid]::NewGuid().ToString('N'))
-    $stageModule = Join-Path $stage 'SecondLine'
-    New-Item -ItemType Directory -Path $stageModule -WhatIf:$false | Out-Null
-    Copy-Item -Path (Join-Path $ModuleDir '*') -Destination $stageModule -Recurse -WhatIf:$false
-    Copy-Item -Path (Join-Path $Repo 'LICENSE') -Destination $stageModule -WhatIf:$false
+    # The same staging Test-SecondLinePackage.ps1 validates: module, LICENSE, shared policy.
+    $stageModule = & (Join-Path $PSScriptRoot 'Build-SecondLinePackage.ps1') -OutputPath $stage
     Get-ChildItem $stageModule -Recurse -File | ForEach-Object {
         Write-Info $_.FullName.Substring($stageModule.Length + 1)
     }
