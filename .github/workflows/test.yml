@@ -23,6 +23,8 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+# Each stage is its own step, so the run page shows which one is running or failed,
+# with its own time and log. The Summary step adds one table of every stage.
 jobs:
   # PowerShell 7 first: it's the faster shell, it runs the shell-independent checks
   # once (lint, line endings, package), and it stops at the first failing test.
@@ -43,8 +45,24 @@ jobs:
           path: ~\Documents\PowerShell\Modules
           key: modules-pwsh-pester5-pssa-v1
 
-      - name: Lint, line endings, package, tests
-        run: ./build/Invoke-Checks.ps1 -Package -StopOnFirstFailure -InstallMissing
+      - name: Modules
+        run: ./build/Invoke-Checks.ps1 -Stage Modules -InstallMissing
+
+      - name: Lint
+        run: ./build/Invoke-Checks.ps1 -Stage Lint
+
+      - name: Line endings
+        run: ./build/Invoke-Checks.ps1 -Stage LineEndings
+
+      - name: Package
+        run: ./build/Invoke-Checks.ps1 -Stage Package
+
+      - name: Tests (stop at first failure)
+        run: ./build/Invoke-Checks.ps1 -Stage Tests -StopOnFirstFailure
+
+      - name: Summary
+        if: always()
+        run: ./build/Invoke-Checks.ps1 -Stage Summary
 
   # Windows PowerShell 5.1 runs only after 7 passes, so a broken push never starts
   # this machine. It runs the full test suite; the static checks already ran above.
@@ -64,5 +82,12 @@ jobs:
           path: ~\Documents\WindowsPowerShell\Modules
           key: modules-powershell-pester5-v1
 
+      - name: Modules
+        run: ./build/Invoke-Checks.ps1 -Stage Modules -TestsOnly -InstallMissing
+
       - name: Tests
-        run: ./build/Invoke-Checks.ps1 -TestsOnly -InstallMissing
+        run: ./build/Invoke-Checks.ps1 -Stage Tests
+
+      - name: Summary
+        if: always()
+        run: ./build/Invoke-Checks.ps1 -Stage Summary
