@@ -33,7 +33,12 @@ function Get-SecondLineStandard {
 
     if (-not $Path) { $Path = $env:SECONDLINE_STANDARD }
     if (-not $Path) { $Path = Find-SLStandardPath }
-    if (-not $Path) { throw 'SecondLine standard not found in the current folder or its parents.' }
+    if (-not $Path) {
+        throw ("SecondLine standard not found in the current folder or its parents. " +
+            "Pass -Path, set SECONDLINE_STANDARD, or create secondline.standard.psd1 here or in a parent folder " +
+            "(for example your home folder, to cover every repo under it). " +
+            "Start from the example: https://github.com/douglaine/SecondLine/blob/main/examples/secondline.standard.psd1")
+    }
 
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "SecondLine standard not found: $Path. Pass -Path, set SECONDLINE_STANDARD, or put secondline.standard.psd1 in the current folder."
