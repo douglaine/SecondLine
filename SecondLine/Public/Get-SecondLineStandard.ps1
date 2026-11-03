@@ -45,12 +45,9 @@ function Get-SecondLineStandard {
     }
     $Path = (Resolve-Path -LiteralPath $Path).ProviderPath
 
-    try {
-        $data = Read-SLStandardData -Path $Path
-    }
-    catch {
-        throw "Could not read $Path as a PowerShell data file: $($_.Exception.Message)"
-    }
+    # Read-SLStandardData names the exact file that failed (which may be a parent
+    # reached through Extends), so pass its message through unchanged.
+    $data = Read-SLStandardData -Path $Path
 
     $problems = New-Object System.Collections.Generic.List[string]
     $hasTools = $data.ContainsKey('Tools') -and $null -ne $data.Tools -and @($data.Tools).Count -gt 0
