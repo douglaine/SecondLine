@@ -33,6 +33,20 @@ config file, without slowing or blocking the shell.
   has a timeout, so they can't hang a job. `Get-SLMongoStatus` fits as a startup check.
   `Start-SLMongo` waits for every port and a PRIMARY, so it belongs in a background job, not inline.
 
+- **Clean first run after an upgrade (safe mode):** the runner stamps the SecondLine version it
+  last ran under. When the installed version differs, that startup runs no tasks at all. It only
+  checks the config against the new release's task list (unknown or renamed task names, settings
+  that changed shape), writes a short report ("2 new tasks available, off; config OK"), and
+  updates the stamp. The next shell start runs the selected tasks normally.
+  - The "reboot" is the next shell open, or `Invoke-SLStartup` by hand. The runner does not
+    relaunch the terminal itself: it can't cleanly replace the user's window, and a bad task
+    could loop.
+  - If the config check fails, tasks stay off until it's fixed, rather than running on a config
+    the new release reads differently.
+- **Crash guard:** a task that fails or times out on two starts in a row is marked suspended and
+  skipped until the user clears it (`Resume-SLTask <name>`), so one broken task can't break
+  every shell.
+
 Rules:
 
 - Never wait on a startup job from the profile (no `Wait-Job`, no `Receive-Job -Wait`), and don't
