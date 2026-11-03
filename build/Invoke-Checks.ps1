@@ -73,6 +73,8 @@ if ($needPssa) {
 if (-not $TestsOnly) {
     # ------------------------------------------------------------ 1. lint --
     Write-Stage 'Lint'
+    # Child scripts only set an exit code on failure; clear any leftover code first.
+    $global:LASTEXITCODE = 0
     & (Join-Path $PSScriptRoot 'Test-Lint.ps1')
     if ($LASTEXITCODE -ne 0) { Stop-Checks 'lint' }
 
@@ -85,7 +87,9 @@ if (-not $TestsOnly) {
     # --------------------------------------------------------- 3. package --
     if ($Package) {
         Write-Stage 'Release package'
-        & (Join-Path $PSScriptRoot 'Test-SecondLinePackage.ps1')
+        # Child scripts only set an exit code on failure; clear any leftover code first.
+    $global:LASTEXITCODE = 0
+    & (Join-Path $PSScriptRoot 'Test-SecondLinePackage.ps1')
         if ($LASTEXITCODE -ne 0) { Stop-Checks 'package' }
     }
 }
