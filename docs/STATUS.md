@@ -18,7 +18,9 @@ config file, without slowing or blocking the shell.
   (check or action). New features register themselves; the runner never needs editing.
 - **Per-machine config (`.psd1`):** turns each task on or off and sets how often it runs
   (`Startup`, `Daily`, `Weekly`, `OnDemand`). Read with `Import-PowerShellDataFile`, which works in
-  5.1 and 7. No config file means nothing runs.
+  5.1 and 7. Everything is opt-in: no config file means nothing runs, and a task a new release
+  adds stays off until the user turns it on, so an upgrade never starts Mongo or anything else
+  on its own. `New-SLConfig` writes a starter file with every task listed and disabled.
 - **Entry point:** `Invoke-SLStartup` reads the config, checks each task's last-run stamp, and
   starts what's due. `Invoke-SLTask <name>` runs one on demand.
 - **How tasks run:**
