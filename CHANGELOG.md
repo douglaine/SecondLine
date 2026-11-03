@@ -2,6 +2,24 @@
 
 All notable changes to SecondLine. Versions follow [Semantic Versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- `AppliesWhen` on a tool: a list of file patterns. The tool is only checked in a git repo that
+  contains a matching file (or, outside a repo, a folder that has one), and is reported as
+  `SKIPPED` elsewhere. `SKIPPED` isn't a failure: the summary counts only the tools checked,
+  and `-Strict` ignores it.
+
+### Fixed
+
+- The `@development` baseline no longer reports a false .NET SDK `MISMATCH` in repos with no
+  .NET in them. Its .NET check now has `AppliesWhen` (`global.json`, `*.sln`, `*.slnx`,
+  `*.csproj`, `*.fsproj`), and its fix hint says to add a `global.json` pinning the SDK, which
+  is what stops a repo from silently building with a newer preview SDK.
+- "Standard not found" now says how to create one, and a standard that won't parse reports the
+  error once, naming the file that failed.
+
 ## 0.3.0 - 2026-10-21
 
 Every git repo on a machine follows the same line-ending rules, checked and fixed like tool versions.

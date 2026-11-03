@@ -70,6 +70,17 @@ Test-SecondLine
 Optional per tool: `Arguments` (default `--version`), `VersionPattern`, `Install`,
 `TimeoutSeconds` (default 15; tools that answer but never exit are stopped and flagged).
 
+`AppliesWhen` limits a tool to the places it matters. It's a list of file patterns, and the
+tool is only checked in a git repo containing a matching file (bin, obj and node_modules
+ignored), or, outside a repo, in a folder that has one. Elsewhere it's reported as `SKIPPED`,
+which isn't a failure and doesn't trip `-Strict`. For example, so the .NET SDK isn't flagged
+in a PowerShell repo:
+
+```powershell
+@{ Name = '.NET SDK'; Command = 'dotnet'; Expect = '10.0'; Rule = 'Minor'
+   AppliesWhen = @('global.json', '*.sln', '*.slnx', '*.csproj') }
+```
+
 `Match = 'Any'` is for tools that install side by side. `dotnet --version` reports only the newest
 SDK, which may be a preview, so use `Arguments = '--list-sdks'; Match = 'Any'` and the check
 passes if any installed SDK satisfies the rule. Prerelease builds (`-rc`, `-preview`, ...) are
@@ -260,6 +271,10 @@ requirements in their own standard. Subfolders discover the nearest standard.
 Use the same reviewed SecondLine release across projects; editing a local checkout
 does not update installed Gallery copies. Child overrides intentionally replace named
 requirements, so review them when changing a project's standard.
+
+The baseline's .NET SDK check has `AppliesWhen`, so it only runs in repos with .NET in them
+(a `global.json`, `.sln`, `.slnx`, `.csproj` or `.fsproj`). If you override that tool by
+name in your own standard, copy `AppliesWhen` too, or the check applies everywhere.
 
 This baseline only audits configuration. It does not install tools, change SDK pins,
 or start or stop MongoDB instances.

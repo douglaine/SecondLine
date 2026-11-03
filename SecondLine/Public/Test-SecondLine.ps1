@@ -12,6 +12,9 @@ function Test-SecondLine {
           MISMATCH  found, but the version does not satisfy the rule
           MISSING   not found on PATH
           UNKNOWN   found, but no version could be read from its output
+          SKIPPED   the tool has AppliesWhen and nothing here matches it (for
+                    example the .NET SDK in a repo with no .NET projects).
+                    Not a failure: -Strict ignores it.
 
         With -RepoPath, also checks the git repos at or under that folder against
         the .gitattributes line-ending standard (see Test-SLRepo), using the
@@ -61,6 +64,11 @@ function Test-SecondLine {
     $standard = Get-SecondLineStandard -Path $Path
     $results  = @()
 
+    # AppliesWhen is judged from the current folder, like the standard itself.
+    $here = $null
+    $location = Get-Location
+    if ($location.Provider.Name -eq 'FileSystem') { $here = $location.ProviderPath }
+
     foreach ($tool in $standard.Tools) {
         $result = [pscustomobject]@{
             PSTypeName = 'SecondLine.Result'
@@ -72,6 +80,17 @@ function Test-SecondLine {
             Path       = ''
             Note       = ''
             Install    = $tool.Install
+        }
+
+        if ($tool.AppliesWhen.Count -gt 0 -and $here) {
+            $applies = Test-SLToolApplies -Patterns $tool.AppliesWhen -Path $here
+            if (-not $applies.Applies) {
+                $result.Status  = 'SKIPPED'
+                $result.Note    = "no $($tool.AppliesWhen -join ', ') in $($applies.Where)"
+                $result.Install = ''
+                $results += $result
+                continue
+            }
         }
 
         $cmd = Get-Command -Name $tool.Command -CommandType Application -ErrorAction SilentlyContinue |
@@ -183,7 +202,7 @@ function Test-SecondLine {
     if ($PassThru) { $results }
 
     if ($Strict) {
-        $bad = @($results | Where-Object { $_.Status -ne 'OK' })
+        $bad = @($results | Where-Object { $_.Status -ne 'OK' -and $_.Status -ne 'SKIPPED' })
         if ($bad.Count -gt 0) {
             $what = 'tools'
             if ($RepoPath) { $what = 'checks' }

@@ -18,6 +18,14 @@ function Get-SecondLineStandard {
 
         A standard needs Tools, GitAttributes, or both.
 
+        A tool can have AppliesWhen, a list of file patterns. Then it is only
+        checked in a git repo that contains a matching file (outside a repo: in a
+        folder that does), and reported as SKIPPED elsewhere. The shared
+        @development baseline uses this so the .NET SDK is only checked in .NET
+        repos:
+
+          AppliesWhen = @('global.json', '*.sln', '*.slnx', '*.csproj')
+
         Where the file is looked for, in order:
           1. -Path
           2. the SECONDLINE_STANDARD environment variable
@@ -86,6 +94,14 @@ function Get-SecondLineStandard {
         $timeout = 15
         if ($t.ContainsKey('TimeoutSeconds')) { $timeout = [int] $t.TimeoutSeconds }
 
+        $appliesWhen = @()
+        if ($t.ContainsKey('AppliesWhen')) {
+            $appliesWhen = @(@($t.AppliesWhen) | Where-Object { "$_" } | ForEach-Object { "$_" })
+            if ($appliesWhen.Count -eq 0) {
+                $problems.Add("$label has an empty AppliesWhen. List file patterns, like @('*.sln', 'global.json'), or remove it.")
+            }
+        }
+
         $tools += [pscustomobject]@{
             Name           = "$($t.Name)"
             Command        = "$($t.Command)"
@@ -96,6 +112,7 @@ function Get-SecondLineStandard {
             VersionPattern = "$($t.VersionPattern)"
             Install        = "$($t.Install)"
             TimeoutSeconds = $timeout
+            AppliesWhen    = $appliesWhen
         }
     }
 
