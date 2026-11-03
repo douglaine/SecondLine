@@ -41,8 +41,25 @@ config file, without slowing or blocking the shell.
   - The "reboot" is the next shell open, or `Invoke-SLStartup` by hand. The runner does not
     relaunch the terminal itself: it can't cleanly replace the user's window, and a bad task
     could loop.
-  - If the config check fails, tasks stay off until it's fixed, rather than running on a config
-    the new release reads differently.
+  - If the config check fails, or the new version won't import at all, roll back to the
+    last-known-good version (below) instead of running on a config the new release reads
+    differently.
+- **Rollback to last-known-good:** this works because `Update-Module` and `Install-Module`
+  install each version side by side in its own folder (`SecondLine\0.2.0\`, `SecondLine\0.3.0\`)
+  and leave the old one in place.
+  - A small stub in `$PROFILE` imports SecondLine by a pinned version read from a pointer file
+    (`Import-Module SecondLine -RequiredVersion <good>`), not whatever is newest. The rollback
+    logic lives in that stub, not in the module, because a broken release may not import far
+    enough to roll itself back.
+  - Upgrade flow: the stub sees a newer version installed, imports it, and runs the safe-mode
+    check. On pass it moves the pointer to the new version. On fail it re-imports the pinned
+    version, keeps the pointer where it was, and reports why ("0.3.0 failed config check: task
+    `MongoStart` renamed; still on 0.2.0").
+  - The config is backed up before the check, so a rollback restores the config the old version
+    expects too.
+  - If the old version folder is gone (`Uninstall-Module -AllVersions`, manual cleanup), there's
+    nothing to roll back to: report it and run no tasks.
+  - Rollback is only for upgrade failures. An ordinary task failure is the crash guard's job.
 - **Crash guard:** a task that fails or times out on two starts in a row is marked suspended and
   skipped until the user clears it (`Resume-SLTask <name>`), so one broken task can't break
   every shell.
