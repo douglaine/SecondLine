@@ -9,7 +9,43 @@ Where the project stands and what's next. Released work is in [CHANGELOG.md](../
 
 ## To do
 
+### Startup task runner
+
+One entry point, called from `$PROFILE`, that runs a per-machine list of tasks according to a
+config file, without slowing or blocking the shell.
+
+- **Task registry in the module:** each task has a name, the function it calls, and a kind
+  (check or action). New features register themselves; the runner never needs editing.
+- **Per-machine config (`.psd1`):** turns each task on or off and sets how often it runs
+  (`Startup`, `Daily`, `Weekly`, `OnDemand`). Read with `Import-PowerShellDataFile`, which works in
+  5.1 and 7. No config file means nothing runs.
+- **Entry point:** `Invoke-SLStartup` reads the config, checks each task's last-run stamp, and
+  starts what's due. `Invoke-SLTask <name>` runs one on demand.
+- **How tasks run:**
+  - *Checks* (fast, read-only, such as the version audit or `Get-SLMongoStatus`): thread jobs started
+    after the prompt appears (`OnIdle` engine event), each with a hard timeout.
+  - *Actions* (slow or changing, such as IDE sync or installs): Task Scheduler, so they run without a
+    terminal open and can run elevated. Startup only reports that one is due.
+  - *Interactive* (anything that may need to ask, such as picking between replica sets): on demand.
+- **The Mongo commands are the first real tasks.** Since 0.2.0 every `mlaunch` and `mongosh` call
+  has a timeout, so they can't hang a job. `Get-SLMongoStatus` fits as a startup check.
+  `Start-SLMongo` waits for every port and a PRIMARY, so it belongs in a background job, not inline.
+
+Rules:
+
+- Never wait on a startup job from the profile (no `Wait-Job`, no `Receive-Job -Wait`), and don't
+  let a child process inherit the console's output handle. Either one brings back the stuck-startup
+  hang.
+- Background jobs can't prompt or elevate. A task that might need to belongs on demand.
+- Jobs write results to a status file. The next prompt shows a one-line summary instead of
+  printing over what you're typing.
+- Config and last-run stamps live in a local per-user folder that OneDrive doesn't sync, so two
+  machines never share one stamp. PowerShell 7.7 plans to move user content out of Documents for
+  the same reason.
+
 ### IDE extension and workload sync
+
+Becomes a task under the runner (an action, `Weekly`), once the runner exists.
 
 Make every dev machine end up with the same IDE tooling automatically, driven by files in each repo.
 
