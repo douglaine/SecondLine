@@ -22,6 +22,8 @@ function Stop-SLMongo {
     .EXAMPLE
         Stop-SLMongo
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Quiet',
+        Justification = 'Read by the nested Say function.')]
     [CmdletBinding(SupportsShouldProcess)]
     param(
         [string] $Path,

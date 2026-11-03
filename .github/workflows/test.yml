@@ -23,6 +23,16 @@ jobs:
           Set-PSRepository PSGallery -InstallationPolicy Trusted
           Install-Module Pester -MinimumVersion 5.5 -Scope CurrentUser -Force -SkipPublisherCheck
 
+      - name: Lint (PSScriptAnalyzer)
+        run: |
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $findings = @(Invoke-ScriptAnalyzer -Path ./SecondLine -Recurse -Settings ./PSScriptAnalyzerSettings.psd1)
+          if ($findings.Count -gt 0) {
+            $findings | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize -Wrap | Out-String -Width 200 | Write-Host
+          }
+          $bad = @($findings | Where-Object { 'Error', 'Warning' -contains "$($_.Severity)" })
+          if ($bad.Count -gt 0) { Write-Error "PSScriptAnalyzer: $($bad.Count) finding(s)."; exit 1 }
+
       - name: Run tests
         run: |
           Import-Module Pester -MinimumVersion 5.5

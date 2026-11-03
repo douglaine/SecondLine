@@ -6,6 +6,8 @@
 # A Process with redirected streams and WaitForExit(timeout) avoids both.
 
 function Invoke-SLTool {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '',
+        Justification = 'Kill after a timeout fails if the process exited meanwhile; that is the outcome we want.')]
     param(
         [Parameter(Mandatory)] [string] $Path,
         [string]   $Arguments = '',

@@ -143,6 +143,10 @@ Every repo carries a `.gitattributes` that decides line endings, so no machine's
 ```
 Add the language's source types as LF (e.g. `*.cs`, `*.razor`, `*.csproj` for .NET).
 
+SecondLine ships this rule as profiles (`docs`, `powershell`, `dotnet`): `Test-SLRepo C:\src`
+checks every repo against them, and `Set-SLGitAttributes` writes or completes a repo's
+`.gitattributes` and renormalizes it without committing. See the README, "Repos: line endings".
+
 ### "LF will be replaced by CRLF the next time Git touches it"
 **Symptom:** `git add` warns about files you just created.
 **Why:** the file on disk has LF endings (written by a tool, an editor set to LF, or generated on
@@ -158,7 +162,17 @@ git status          # only real content changes should remain
 ### Add `.gitattributes` in the first commit
 Adding it to an existing repo means files already committed may have mixed endings. Then
 `git add --renormalize .` and commit the result on its own, so the line-ending change doesn't
-hide inside a real diff.
+hide inside a real diff. (`Set-SLGitAttributes` does the renormalize and stops before the
+commit; it refuses to run on a dirty tree for this reason.)
+
+### After adding `.gitattributes`, untouched files show as modified
+**Symptom:** `git status` lists files you never edited as modified, right after a
+`.gitattributes` change.
+**Why:** files committed with CRLF no longer match what the new rules would store (LF). When git
+re-checks a file, it sees the difference. Whether it re-checks depends on timestamps, so it can
+come and go between runs.
+**Fix:** that's what `git add --renormalize .` is for. To tell real edits apart, compare ignoring
+line endings: `git diff --ignore-cr-at-eol --name-only` lists only files with real changes.
 
 ---
 

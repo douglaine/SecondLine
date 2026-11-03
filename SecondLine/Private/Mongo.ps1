@@ -140,10 +140,11 @@ function Resolve-SLMongoReplicaSet {
     if ($all.Count -eq 0) {
         throw "No .mlaunch_startup found under: $roots. Pass -Path, or set SECONDLINE_MONGO_DIR to the folder you passed to 'mlaunch init --dir'."
     }
-    $list = ($all | ForEach-Object {
-        $state = if ($_.Valid) { 'valid' } else { "invalid: $($_.Problem)" }
-        "  - $($_.Dir) ($state)"
-    }) -join "`n"
+    $lines = foreach ($s in $all) {
+        $state = if ($s.Valid) { 'valid' } else { "invalid: $($s.Problem)" }
+        "  - $($s.Dir) ($state)"
+    }
+    $list = $lines -join "`n"
     if ($valid.Count -eq 0) {
         throw "Found .mlaunch_startup files, but none describe a usable replica set:`n$list"
     }
